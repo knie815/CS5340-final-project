@@ -1,0 +1,1037 @@
+<meta charset="utf-8">
+<title>BorrowIt from the Library of Things</title>
+<style>
+  :root {
+    /* brand */
+    --ink:        #163F35;   /* deep spruce green */
+    --ink-2:      #1F5347;
+    --accent:     #1F5347;   /* spruce green accent */
+    --accent-ink: #163F35;
+    /* neutrals, green-biased */
+    --paper:      #FAF8F3;
+    --surface:    #FFFFFF;
+    --surface-2:  #F1EEE6;
+    --line:       #E1DCCF;
+    --text:       #1C221F;
+    --text-2:     #56605A;
+    --text-3:     #838C86;
+    /* semantic availability (separate from accent) */
+    --ok:      #2E7D5B;
+    --ok-bg:   #E4F1EA;
+    --warn:    #C77F1E;
+    --warn-bg: #FBEFD8;
+    --out:     #B5543C;
+    --out-bg:  #F6E4DE;
+
+    --shadow-sm: 0 1px 2px rgba(22,63,53,.06), 0 1px 3px rgba(22,63,53,.08);
+    --shadow-md: 0 4px 12px rgba(22,63,53,.10), 0 2px 4px rgba(22,63,53,.06);
+    --shadow-lg: 0 18px 40px rgba(22,63,53,.16);
+    --radius: 14px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --maxw: 1120px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--paper); color: var(--text); color-scheme: light;
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3 { text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+  .mono { font-family: var(--mono); }
+  a { color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
+  :focus-visible { outline: 2.5px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: var(--maxw); margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    background: var(--ink); color: var(--paper);
+    display: grid; place-items: center; font-weight: 800; font-size: 18px;
+    position: relative; overflow: hidden;
+  }
+  .brand-name { font-weight: 800; font-size: 18px; letter-spacing: -0.03em; color: var(--text); }
+  .brand-name b { color: var(--ink); }
+  .topbar-search {
+    flex: 1; display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 14px; max-width: 520px;
+  }
+  .topbar-search input { border: none; background: none; flex: 1; font-size: 14px; color: var(--text); outline: none; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+  .nav-btn {
+    background: none; border: 1px solid var(--line); color: var(--text-2);
+    height: 38px; padding: 0 15px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  }
+  .nav-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--ink); }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--ink-2); color: var(--paper);
+    display: grid; place-items: center; font-weight: 700; font-size: 14px; border: none;
+  }
+  .user-menu { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow-lg); min-width: 200px; padding: 6px; overflow: hidden;
+  }
+  .menu-head { padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .menu-name { font-weight: 700; font-size: 14px; color: var(--text); }
+  .menu-email { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .menu-item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    padding: 9px 10px; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-2);
+  }
+  .menu-item:hover { background: var(--surface-2); color: var(--text); }
+
+  /* ---------- Screen system ---------- */
+  .screen { display: none; }
+  .screen.active { display: block; animation: fade .35s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce){ .screen.active{ animation:none; } }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; letter-spacing:.01em; }
+  .badge { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:12px; font-weight:600; padding:4px 9px; border-radius:8px; letter-spacing:-.01em; }
+  .b-ok   { background:var(--ok-bg);   color:var(--ok); }
+  .b-warn { background:var(--warn-bg); color:var(--warn); }
+  .b-out  { background:var(--out-bg);  color:var(--out); }
+  .dot { width:7px; height:7px; border-radius:50%; background: currentColor; }
+
+  .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius: 11px; font-weight:700; font-size:15px; padding:12px 20px;
+    background: var(--ink); color: var(--paper); transition: transform .08s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .btn-ghost:hover { background: var(--surface-2); filter:none; }
+  .btn-sm { padding: 8px 14px; font-size: 13px; border-radius: 9px; }
+
+  /* ============ SIGN IN ============ */
+  #signin { min-height: 100vh; display: grid; grid-template-columns: 1.05fr .95fr; }
+  @media (max-width: 820px){ #signin{ grid-template-columns: 1fr; } .signin-art{ display:none; } }
+  .signin-art {
+    background: linear-gradient(150deg, var(--ink), var(--ink-2));
+    color: var(--paper); padding: 56px; display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden;
+  }
+  .signin-art h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.05; }
+  .signin-art .lede { font-size: 18px; opacity: .9; white-space: nowrap; margin-top: 18px; }
+  .art-tiles { display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-top:34px; max-width: 420px; }
+  .art-tile { background: rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.32); border-radius:12px; padding:14px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
+  .art-tile .em { font-size: 24px; }
+  .art-tile .lbl { font-size:12px; opacity:1; font-weight:600; margin-top:8px; }
+  .art-tile .lbl:first-child { margin-top:0; }
+  .art-glow { position:absolute; width:340px; height:340px; border-radius:50%; background: var(--accent); opacity:.16; filter: blur(30px); right:-80px; top:-60px; }
+  .signin-form { display: grid; place-items: center; padding: 40px 24px; }
+  .signin-card { width: 100%; max-width: 360px; }
+  .signin-card .sub { color: var(--text-2); margin: 8px 0 30px; }
+  .google-btn {
+    width:100%; display:flex; align-items:center; justify-content:center; gap:12px;
+    background: var(--surface); color: var(--text); border:1.5px solid var(--line);
+    border-radius: 12px; padding: 13px; font-weight:600; font-size:15px; box-shadow: var(--shadow-sm);
+  }
+  .google-btn:hover { background: var(--surface-2); }
+  .or { display:flex; align-items:center; gap:12px; color: var(--text-3); font-size:13px; margin: 18px 0; }
+  .or::before, .or::after { content:""; height:1px; background: var(--line); flex:1; }
+  .field { border:1.5px solid var(--line); background:var(--surface); border-radius:12px; padding:12px 14px; width:100%; font-size:15px; color:var(--text); margin-bottom:12px; }
+  .fineprint { font-size:12px; color: var(--text-3); margin-top: 22px; text-align:center; }
+  .no-card-note { display:flex; gap:8px; align-items:flex-start; background:var(--ok-bg); color:var(--ok); border-radius:10px; padding:10px 12px; font-size:13px; font-weight:600; margin-top:20px; }
+
+  /* ============ HOME ============ */
+  .hero { padding: 46px 0 30px; }
+  .eyebrow { font-family:var(--mono); font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color: var(--ink); }
+  .hero h1 { font-size: clamp(30px, 4.6vw, 50px); line-height: 1.04; margin-top: 12px; max-width: 16ch; }
+  .hero p { color: var(--text-2); font-size: 18px; max-width: 52ch; margin-top: 16px; }
+  .search-hero {
+    margin-top: 26px; display:flex; gap:10px; background: var(--surface); border:1.5px solid var(--line);
+    border-radius: 16px; padding: 10px 10px 10px 18px; box-shadow: var(--shadow-md); max-width: 780px; align-items:center;
+  }
+  .search-hero input { border:none; background:none; flex:1; min-width:120px; font-size:16px; color: var(--text); outline:none; }
+  .search-hero .hero-select {
+    border:none; background:none; border-left:1px solid var(--line); padding:0 8px 0 12px;
+    font-size:14px; color: var(--text-2); font-family:inherit; cursor:pointer; outline:none;
+    max-width:150px;
+  }
+  .search-hero .hero-select:focus { color: var(--text); }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; align-items:center; }
+  .chips .lbl { font-size:13px; color: var(--text-3); margin-right:2px; }
+  .chip { background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:6px 13px; font-size:13px; font-weight:600; color:var(--text-2); }
+  .chip:hover { border-color: var(--ink); color: var(--ink); }
+
+  .section-head { display:flex; align-items:baseline; justify-content:space-between; margin: 40px 0 16px; gap: 12px; }
+  .section-head h2 { font-size: 22px; }
+  .link { color: var(--ink); font-weight:600; font-size:14px; background:none; border:none; cursor:pointer; }
+  .link:hover { text-decoration: underline; }
+
+  .cat-grid { display:grid; grid-template-columns: repeat(6,1fr); gap: 12px; }
+  @media (max-width: 900px){ .cat-grid{ grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 520px){ .cat-grid{ grid-template-columns: repeat(2,1fr); } }
+  .cat {
+    background: var(--surface); border:1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 14px; text-align:left; transition: transform .12s, box-shadow .15s;
+  }
+  .cat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--ink) 40%, var(--line)); }
+  .cat .em { font-size: 26px; }
+  .cat .name { font-weight:700; margin-top:12px; font-size:15px; }
+  .cat .count { font-family:var(--mono); font-size:12px; color: var(--text-3); margin-top:3px; }
+
+  .lib-row { display:grid; grid-template-columns: repeat(4,1fr); gap:14px; }
+  @media (max-width: 900px){ .lib-row{ grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 520px){ .lib-row{ grid-template-columns: 1fr; } }
+  .lib-card { background:var(--surface); border:1px solid var(--line); border-radius: var(--radius); padding:16px; }
+  .lib-card .nm { font-weight:700; }
+  .lib-card .meta { font-size:13px; color: var(--text-2); margin-top:6px; display:flex; align-items:center; gap:6px; }
+  .lib-card .mono { color: var(--text-3); font-size:12px; margin-top:10px; }
+
+  /* ============ RESULTS ============ */
+  .results-top { padding: 26px 0 10px; }
+  .breadcrumb { font-size:13px; color:var(--text-2); display:flex; align-items:center; gap:8px; }
+  .breadcrumb button { background:none; border:none; color:var(--ink); font-weight:600; }
+  .results-layout { display:grid; grid-template-columns: 232px 1fr; gap: 28px; padding-bottom: 60px; }
+  @media (max-width: 820px){ .results-layout{ grid-template-columns: 1fr; } .filters{ position:static !important; } }
+  .filters { position: sticky; top: 84px; align-self:start; display:flex; flex-direction:column; gap: 22px; }
+  .filter-group h4 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:10px; font-family:var(--mono); }
+  .facet { display:flex; align-items:center; gap:9px; font-size:14px; color:var(--text-2); padding:5px 0; cursor:pointer; }
+  .facet input { accent-color: var(--ink); width:16px; height:16px; }
+  .facet.on { color: var(--text); font-weight:600; }
+  .results-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:12px; flex-wrap:wrap; }
+  .results-head .count { font-size:14px; color: var(--text-2); }
+  .results-head .count b { color: var(--text); }
+  .grid-items { display:grid; grid-template-columns: repeat(3,1fr); gap:18px; }
+  @media (max-width: 900px){ .grid-items{ grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 560px){ .grid-items{ grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border:1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden; display:flex; flex-direction:column; transition: transform .12s, box-shadow .15s;
+    text-align:left; padding:0;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+  .thumb { aspect-ratio: 4/3; display:grid; place-items:center; position:relative; }
+  .thumb .avail-tag { position:absolute; top:10px; left:10px; }
+  .mono-thumb { font-family:var(--mono); font-weight:700; letter-spacing:2px; color:var(--ink); opacity:.55; font-size:38px; }
+  .mono-thumb.lg { font-size:96px; }
+  .mono-thumb.sm { font-size:20px; opacity:.7; }
+  .card-body { padding:14px 15px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .card-body .cat-tag { font-family:var(--mono); font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; }
+  .card-body .title { font-weight:700; font-size:16px; line-height:1.25; }
+  .card-body .locs { font-size:13px; color: var(--text-2); margin-top:2px; display:flex; align-items:center; gap:6px; }
+  .card-foot { margin-top:auto; padding-top:12px; display:flex; align-items:center; justify-content:space-between; }
+  .card-foot .dist { font-family:var(--mono); font-size:12px; color: var(--text-3); }
+
+  /* ============ ITEM DETAIL ============ */
+  .detail { padding: 26px 0 70px; }
+  .detail-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top:18px; }
+  @media (max-width: 820px){ .detail-grid{ grid-template-columns: 1fr; gap:26px; } }
+  .detail-media { background:var(--surface); border:1px solid var(--line); border-radius: 18px; aspect-ratio: 1/1; display:grid; place-items:center; font-size: 140px; box-shadow: var(--shadow-sm); }
+  .detail h1 { font-size: clamp(26px,3.4vw,38px); margin-top:10px; }
+  .detail .desc { color: var(--text-2); font-size:16px; margin-top:16px; }
+  .spec-row { display:flex; gap:26px; margin-top:22px; flex-wrap:wrap; }
+  .spec .k { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); }
+  .spec .v { font-weight:700; margin-top:3px; }
+  .avail-panel { margin-top:26px; border:1px solid var(--line); border-radius: var(--radius); overflow:hidden; }
+  .avail-panel .ap-head { background: var(--surface-2); padding:12px 16px; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:space-between; }
+  .avail-panel .ap-head .live { font-family:var(--mono); font-size:11px; color:var(--ok); display:flex; align-items:center; gap:6px; font-weight:600; }
+  .live .dot { animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100%{ opacity:1;} 50%{ opacity:.3; } }
+  @media (prefers-reduced-motion: reduce){ .live .dot{ animation:none; } }
+  .loc-line { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-top:1px solid var(--line); gap:12px; }
+  .loc-line:first-child { border-top:none; }
+  .loc-line .li { display:flex; flex-direction:column; gap:3px; }
+  .loc-line .nm { font-weight:600; font-size:15px; }
+  .loc-line .mt { font-size:13px; color: var(--text-2); font-family:var(--mono); }
+  .loc-line .right { display:flex; align-items:center; gap:14px; }
+
+  /* ============ RESERVE / CONFIRM ============ */
+  .flow { max-width: 640px; margin: 0 auto; padding: 34px 0 70px; }
+  .steps { display:flex; align-items:center; gap:8px; margin-bottom:28px; font-size:13px; }
+  .step { display:flex; align-items:center; gap:8px; color: var(--text-3); font-weight:600; }
+  .step .n { width:24px; height:24px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font-family:var(--mono); font-size:12px; }
+  .step.done .n { background: var(--ok); border-color:var(--ok); color:#fff; }
+  .step.cur { color: var(--ink); }
+  .step.cur .n { border-color: var(--ink); color: var(--ink); }
+  .steps .sep { flex:1; height:1.5px; background: var(--line); }
+  .panel { background: var(--surface); border:1px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: var(--shadow-sm); }
+  .panel h2 { font-size:22px; }
+  .panel .lead { color: var(--text-2); margin-top:6px; }
+  .opt { display:flex; align-items:center; gap:14px; border:1.5px solid var(--line); border-radius:12px; padding:14px 16px; margin-top:12px; cursor:pointer; transition: border-color .12s, background .12s; }
+  .opt:hover { border-color: var(--ink); }
+  .opt.sel { border-color: var(--ink); background: var(--ok-bg); }
+  .opt .radio { width:20px; height:20px; border-radius:50%; border:2px solid var(--line); flex-shrink:0; display:grid; place-items:center; }
+  .opt.sel .radio { border-color: var(--ink); }
+  .opt.sel .radio::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--ink); }
+  .opt .oi { flex:1; }
+  .opt .oi .nm { font-weight:700; }
+  .opt .oi .mt { font-size:13px; color: var(--text-2); margin-top:2px; }
+  .date-row { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .date-btn { border:1.5px solid var(--line); background:var(--surface); border-radius:11px; padding:10px 14px; text-align:center; min-width:78px; }
+  .date-btn.sel { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .date-btn .d { font-family:var(--mono); font-size:12px; opacity:.8; }
+  .date-btn .n { font-weight:700; font-size:16px; }
+  .dur-btn { border:1.5px solid var(--line); background:var(--surface); border-radius:11px; padding:10px 16px; font-weight:700; font-size:14px; color:var(--text); }
+  .dur-btn.sel { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .dur-hint { font-size:13px; color: var(--text-3); margin-top:10px; }
+  .flow-actions { display:flex; justify-content:space-between; margin-top:26px; gap:12px; }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; margin-top:20px; padding:14px 16px; background:var(--surface-2); border-radius:12px; }
+  .toggle-row .t { font-weight:600; font-size:14px; }
+  .toggle-row .s { font-size:13px; color: var(--text-2); }
+  .switch { width:46px; height:26px; border-radius:999px; background:var(--line); border:none; position:relative; transition: background .15s; flex-shrink:0; }
+  .switch::after { content:""; position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:3px; left:3px; transition: left .15s; box-shadow: var(--shadow-sm); }
+  .switch.on { background: var(--ok); }
+  .switch.on::after { left:23px; }
+
+  /* confirm */
+  .confirm-hero { text-align:center; padding: 12px 0 6px; }
+  .check { width:70px; height:70px; border-radius:50%; background: var(--ok-bg); color: var(--ok); display:grid; place-items:center; font-size:36px; margin:0 auto 18px; }
+  .confirm-hero h1 { font-size: 30px; }
+  .confirm-hero p { color: var(--text-2); margin-top:8px; }
+  .ticket { background: var(--surface); border:1px solid var(--line); border-radius:16px; margin-top:24px; overflow:hidden; box-shadow: var(--shadow-md); }
+  .ticket-top { padding:20px 22px; display:flex; gap:16px; align-items:center; border-bottom:1px dashed var(--line); }
+  .ticket-top .em { font-size:44px; }
+  .ticket-code { background: var(--ink); color: var(--paper); padding:14px 22px; display:flex; align-items:center; justify-content:space-between; }
+  .ticket-code .lbl { font-size:12px; opacity:.85; }
+  .ticket-code .code { font-family:var(--mono); font-size:24px; font-weight:700; letter-spacing:.08em; }
+  .ticket-info { padding:18px 22px; display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  .ticket-info .k { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em; color: var(--text-3); }
+  .ticket-info .v { font-weight:600; margin-top:3px; }
+
+  /* ============ MY RESERVATIONS ============ */
+  .resv { padding: 30px 0 70px; }
+  .resv h1 { font-size: 30px; }
+  .resv .sub { color: var(--text-2); margin-top:6px; }
+  .resv-list { display:flex; flex-direction:column; gap:14px; margin-top:24px; }
+  .resv-card { background:var(--surface); border:1px solid var(--line); border-radius: var(--radius); padding:16px 18px; display:flex; align-items:center; gap:16px; }
+  .resv-card .em { font-size:36px; }
+  .resv-card .info { flex:1; }
+  .resv-card .info .nm { font-weight:700; font-size:16px; }
+  .resv-card .info .mt { font-size:13px; color: var(--text-2); margin-top:3px; }
+  .resv-card .rc { font-family:var(--mono); font-size:13px; color:var(--ink); font-weight:600; }
+  .resv-right { text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+  .link-cancel { background:none; border:none; color:var(--out); font-size:13px; font-weight:600; padding:0; margin-top:8px; }
+  .link-cancel:hover { text-decoration:underline; }
+  .resv-card.confirming { border-color:var(--out); background:var(--out-bg); }
+  .cancel-confirm { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .cancel-confirm .cc-q { font-size:13px; font-weight:600; color:var(--out); margin-right:2px; }
+  .btn-danger { background:var(--out); color:#fff; }
+  .btn-danger:hover { filter:brightness(1.06); }
+  .empty { text-align:center; padding: 60px 20px; color: var(--text-2); }
+  .empty .em { font-size: 48px; }
+
+  .footer { border-top:1px solid var(--line); margin-top:20px; }
+  .footer-inner { max-width: var(--maxw); margin:0 auto; padding: 26px 20px; color: var(--text-3); font-size:13px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+
+  .toast { position: fixed; bottom: 26px; left:50%; transform: translateX(-50%) translateY(80px); background: var(--text); color: var(--paper); padding: 12px 20px; border-radius: 12px; font-weight:600; font-size:14px; box-shadow: var(--shadow-lg); opacity:0; transition: transform .3s, opacity .3s; z-index:100; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity:1; }
+</style>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   BorrowIt from the Library of Things centralized prototype
+   Data model
+   ============================================================ */
+const LIBRARIES = {
+  central:  { name:"Cambridge Central Library",  dist:0.8, hours:"Open · closes 9pm" },
+  somerv:   { name:"Somerville Public Library",  dist:1.9, hours:"Open · closes 8pm" },
+  bostonpl: { name:"Boston Public Library",      dist:3.4, hours:"Open · closes 6pm" },
+  medford:  { name:"Medford Tool Library",       dist:4.7, hours:"Closed · opens 10am" },
+  newton:   { name:"Newton Free Library",        dist:6.1, hours:"Open · closes 9pm" },
+};
+
+/* availability: array of {lib, count} -> count>1 ok, ==0 out, ==1 warn(last one) */
+const ITEMS = [
+  { id:"laminator", name:"Laminator (A3)", em:"📇", cat:"Office", category:"office",
+    desc:"Thermal A3 laminator with adjustable temperature. Great for classroom materials, signage, and preserving documents. Warms up in about 4 minutes.",
+    fee:"Max 7-day loan", maxLoan:7, deposit:"No deposit",
+    avail:[{lib:"central",count:2},{lib:"somerv",count:1},{lib:"newton",count:0}] },
+  { id:"carpet", name:"Carpet Cleaner", em:"🧼", cat:"Home", category:"home",
+    desc:"Deep-clean carpet and upholstery washer with two tanks and a stair attachment. Includes a sample of cleaning solution.",
+    fee:"Max 3-day loan", maxLoan:3, deposit:"$20 deposit",
+    avail:[{lib:"somerv",count:3},{lib:"medford",count:1}] },
+  { id:"sewing", name:"Sewing Machine", em:"🧵", cat:"Craft", category:"craft",
+    desc:"Beginner-friendly sewing machine with 20 stitch patterns, foot pedal, and a starter kit of bobbins and needles.",
+    fee:"Max 14-day loan", maxLoan:14, deposit:"No deposit",
+    avail:[{lib:"central",count:1},{lib:"bostonpl",count:2},{lib:"newton",count:2}] },
+  { id:"drill", name:"Cordless Drill Kit", em:"🔩", cat:"Tools", category:"tools",
+    desc:"18V cordless drill/driver with two batteries, charger, and a 40-piece bit set in a hard case.",
+    fee:"Max 7-day loan", maxLoan:7, deposit:"No deposit",
+    avail:[{lib:"medford",count:4},{lib:"central",count:0},{lib:"somerv",count:0}] },
+  { id:"projector", name:"Portable Projector", em:"📽️", cat:"Electronics", category:"electronics",
+    desc:"1080p portable projector with HDMI, USB-C, and built-in speaker. Ideal for movie nights and presentations.",
+    fee:"Max 5-day loan", maxLoan:5, deposit:"No deposit",
+    avail:[{lib:"bostonpl",count:1},{lib:"newton",count:1}] },
+  { id:"telescope", name:"Telescope", em:"🔭", cat:"Outdoors", category:"outdoors",
+    desc:"70mm refractor telescope with tripod and two eyepieces. Comes with a beginner star-gazing guide.",
+    fee:"Max 14-day loan", maxLoan:14, deposit:"No deposit",
+    avail:[{lib:"newton",count:2},{lib:"central",count:0}] },
+  { id:"pressure", name:"Pressure Washer", em:"💦", cat:"Tools", category:"tools",
+    desc:"Electric 2000 PSI pressure washer for patios, decks, and driveways. Includes three nozzle tips.",
+    fee:"Max 3-day loan", maxLoan:3, deposit:"$20 deposit",
+    avail:[{lib:"medford",count:1}] },
+  { id:"soldering", name:"Soldering Station", em:"🔌", cat:"Electronics", category:"electronics",
+    desc:"Temperature-controlled soldering station with stand, sponge, and spare tips for electronics repair and hobby projects.",
+    fee:"Max 7-day loan", maxLoan:7, deposit:"No deposit",
+    avail:[{lib:"central",count:1},{lib:"medford",count:2}] },
+  { id:"gopro", name:"Action Camera", em:"📸", cat:"Electronics", category:"electronics",
+    desc:"Waterproof 4K action camera with chest and helmet mounts and two batteries. Great for trips and events.",
+    fee:"Max 5-day loan", maxLoan:5, deposit:"$30 deposit",
+    avail:[{lib:"bostonpl",count:0},{lib:"newton",count:0}] },
+];
+
+const CATEGORIES = [
+  { key:"tools", name:"Tools", em:"🔧" },
+  { key:"home", name:"Home & Garden", em:"🏡" },
+  { key:"craft", name:"Craft & Sewing", em:"🧵" },
+  { key:"electronics", name:"Electronics", em:"🔊" },
+  { key:"office", name:"Office", em:"🖇️" },
+  { key:"outdoors", name:"Outdoors", em:"⛺" },
+];
+
+/* ---------- availability helpers ---------- */
+function totalCount(item){ return item.avail.reduce((s,a)=>s+a.count,0); }
+function libsInStock(item){ return item.avail.filter(a=>a.count>0); }
+function statusOf(item){
+  const t = totalCount(item);
+  if (t === 0) return {cls:"b-out", txt:"Checked out"};
+  if (t <= 2)  return {cls:"b-warn", txt:t+" left nearby"};
+  return {cls:"b-ok", txt:"In stock"};
+}
+function nearestDist(item){
+  const inStock = libsInStock(item);
+  const pool = inStock.length ? inStock : item.avail;
+  return Math.min(...pool.map(a=>LIBRARIES[a.lib].dist));
+}
+/* availability entries relevant to the active location filter (all libs if none selected) */
+function candidateAvail(item){
+  return state.filterLib.length ? item.avail.filter(a => state.filterLib.includes(a.lib)) : item.avail;
+}
+/* nearest distance among a set of availability entries (in-stock first, else any) */
+function nearestDistOf(avail){
+  const inStock = avail.filter(a=>a.count>0);
+  const pool = inStock.length ? inStock : avail;
+  return pool.length ? Math.min(...pool.map(a=>LIBRARIES[a.lib].dist)) : Infinity;
+}
+/* loan duration options up to an item's max (in days) */
+function loanOptions(maxLoan){
+  const opts = [1,2,3,5,7,10,14].filter(d => d <= maxLoan);
+  if (!opts.includes(maxLoan)) opts.push(maxLoan);
+  return opts;
+}
+/* return date string from a pickup label like "Mon, Jul 14" plus N days (demo: stays within July) */
+function returnDateStr(pickupLabel, days){
+  const parts = pickupLabel.split(" ");
+  const month = parts[parts.length-2];        // "Jul"
+  const day = parseInt(parts[parts.length-1], 10);
+  return month + " " + (day + days);
+}
+
+/* ---------- app state ---------- */
+const state = {
+  screen: "home",
+  authed: false,
+  afterAuth: null,
+  menuOpen: false,
+  query: "",
+  filterCat: null,
+  filterLib: [],
+  onlyAvailable: false,
+  maxDist: 10,
+  currentItem: null,
+  reserve: { lib:null, date:null, step:1, reminders:true },
+  reservations: [],
+  cancelingCode: null,
+  user: { name:"Katherine Nie", initials:"KN", email:"katherine.nie@xxxxx.com" },
+};
+
+/* ============================================================
+   Router
+   ============================================================ */
+function go(screen){ state.screen = screen; state.cancelingCode = null; render(); window.scrollTo({top:0, behavior:"instant"}); }
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+function search(q){ state.query = q; state.filterCat = null; state.filterLib = []; go("results"); }
+
+/* auth: only gate actions that need an account (e.g. reserving) */
+function requireAuth(action){
+  if (state.authed){ action(); return; }
+  state.afterAuth = action;
+  go("signin");
+}
+function signIn(msg){
+  state.authed = true;
+  if (msg) toast(msg);
+  const next = state.afterAuth;
+  state.afterAuth = null;
+  if (next) next(); else go("home");
+}
+function logOut(){
+  state.authed = false;
+  state.afterAuth = null;
+  state.menuOpen = false;
+  toast("Signed out");
+  go("home");
+}
+
+function openItem(id){
+  state.currentItem = ITEMS.find(i=>i.id===id);
+  const inStock = libsInStock(state.currentItem);
+  state.reserve = { lib: inStock.length ? inStock[0].lib : null, date:null, step:1, reminders:true };
+  go("item");
+}
+
+function filteredItems(){
+  let list = ITEMS.slice();
+  const q = state.query.trim().toLowerCase();
+  if (q) list = list.filter(i => i.name.toLowerCase().includes(q) || i.cat.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+  if (state.filterCat) list = list.filter(i => i.category === state.filterCat);
+  // location, availability and distance are all judged against the location-filtered candidates
+  if (state.filterLib.length) list = list.filter(i => candidateAvail(i).some(a => a.count > 0));
+  if (state.onlyAvailable) list = list.filter(i => candidateAvail(i).some(a => a.count > 0));
+  list = list.filter(i => nearestDistOf(candidateAvail(i)) <= state.maxDist);
+  list.sort((a,b)=> nearestDistOf(candidateAvail(a)) - nearestDistOf(candidateAvail(b)));
+  return list;
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function render(){
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  if (state.screen === "signin"){ app.appendChild(SignIn()); return; }
+  app.appendChild(TopBar());
+  const map = { home:Home, results:Results, item:ItemDetail, reserve:Reserve, confirm:Confirm, reservations:MyReservations };
+  const view = (map[state.screen] || Home)();
+  app.appendChild(view);
+  app.appendChild(Footer());
+}
+
+/* ---------- helpers to build DOM ---------- */
+function el(tag, attrs={}, ...kids){
+  const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)){
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v == null || v === false) continue;   // skip absent/false attributes (e.g. disabled)
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids){ if (kid==null) continue; n.appendChild(typeof kid==="string" ? document.createTextNode(kid) : kid); }
+  return n;
+}
+function screenWrap(id, ...kids){ return el("div", {class:"screen active", id}, ...kids); }
+
+/* ---------- Top bar ---------- */
+function TopBar(){
+  const searchInput = el("input", { type:"text", placeholder:"Search for a tool, appliance, or item…", value: state.query,
+    onkeydown:(e)=>{ if(e.key==="Enter") search(e.target.value); } });
+  return el("header", {class:"topbar"},
+    el("div", {class:"topbar-inner"},
+      el("div", {class:"brand", onclick:()=>go("home")},
+        el("div", {class:"brand-mark"}, "B"),
+        el("div", {class:"brand-name", html:"Borrow<b>It</b>"})
+      ),
+      el("div", {class:"topbar-search"},
+        searchInput
+      ),
+      el("div", {class:"topbar-actions"},
+        state.authed
+          ? el("button", {class:"nav-btn", onclick:()=>go("reservations")},
+              "Reservations" + (state.reservations.length ? " ("+state.reservations.length+")" : ""))
+          : null,
+        state.authed
+          ? el("div", {class:"user-menu"},
+              el("button", {class:"avatar", title:state.user.email, onclick:(e)=>{ e.stopPropagation(); state.menuOpen=!state.menuOpen; render(); }}, state.user.initials),
+              state.menuOpen
+                ? el("div", {class:"menu"},
+                    el("div", {class:"menu-head"},
+                      el("div", {class:"menu-name"}, state.user.name),
+                      el("div", {class:"menu-email"}, state.user.email)),
+                    el("button", {class:"menu-item", onclick:()=>{ state.menuOpen=false; go("reservations"); }}, "My reservations"),
+                    el("button", {class:"menu-item", onclick:()=>logOut()}, "Log out"))
+                : null
+            )
+          : el("button", {class:"nav-btn", onclick:()=>go("signin")}, "Sign in")
+      )
+    )
+  );
+}
+
+/* ---------- Sign In ---------- */
+function SignIn(){
+  return screenWrap("signin",
+    el("div", {class:"signin-art"},
+      el("div", {class:"art-glow"}),
+      el("div", {},
+        el("div", {class:"brand", style:"gap:12px", onclick:()=>go("home")},
+          el("div",{class:"brand-mark", style:"width:40px;height:40px;font-size:22px;background:rgba(255,255,255,.14)"},"B"),
+          el("div",{class:"brand-name", style:"color:inherit;font-size:22px"},"BorrowIt")
+        )
+      ),
+      el("div", {},
+        el("h1", {}, "Borrowing made simple"),
+        el("p", {class:"lede"}, "Search and reserve from any Library of Things near you"),
+        el("div", {class:"art-tiles"},
+          el("div",{class:"art-tile"}, el("div",{class:"lbl"},"Tools & DIY")),
+          el("div",{class:"art-tile"}, el("div",{class:"lbl"},"Craft & home")),
+          el("div",{class:"art-tile"}, el("div",{class:"lbl"},"Electronics"))
+        )
+      ),
+      el("div", {style:"font-size:13px;opacity:.75"}, "XX+ partner libraries")
+    ),
+    el("div", {class:"signin-form"},
+      el("div", {class:"signin-card"},
+        el("h1", {style:"font-size:28px"}, "Welcome"),
+        el("p", {class:"sub"}, "Sign in to reserve items. Searching is always free — no account needed."),
+        el("button", {class:"google-btn", onclick:()=>signIn("Signed in with Google")},
+          el("span", {class:"google-icon", html:'<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>'}),
+          "Continue with Google"),
+        el("div", {class:"or"}, "or"),
+        el("input", {class:"field", type:"email", placeholder:"Email address"}),
+        el("input", {class:"field", type:"password", placeholder:"Password"}),
+        el("button", {class:"btn", style:"width:100%", onclick:()=>signIn()}, "Sign in"),
+        el("div", {class:"no-card-note"}, "No library card needed"),
+        el("button", {class:"link", style:"display:block;margin:18px auto 0", onclick:()=>go("home")}, "← Keep browsing without an account"),
+      )
+    )
+  );
+}
+
+/* ---------- Home ---------- */
+function Home(){
+  const nearby = Object.entries(LIBRARIES).slice(0,4);
+  const heroInput = el("input", { type:"text", placeholder:"Try “laminator”, “carpet cleaner”, “drill”…",
+    onkeydown:(e)=>{ if(e.key==="Enter") runSearch(); } });
+  const catSelect = el("select", {class:"hero-select", "aria-label":"Category"},
+    el("option", {value:""}, "All categories"),
+    ...CATEGORIES.map(c=>el("option", {value:c.key}, c.name))
+  );
+  const distSelect = el("select", {class:"hero-select", "aria-label":"Distance"},
+    ...[2,5,10].map(d=>{
+      const o = el("option", {value:String(d)}, "Within "+d+" mi");
+      if (state.maxDist===d) o.selected = true;
+      return o;
+    })
+  );
+  const runSearch = ()=>{
+    state.query = heroInput.value;
+    state.filterCat = catSelect.value || null;
+    state.filterLib = [];
+    state.maxDist = Number(distSelect.value);
+    go("results");
+  };
+  return screenWrap("home",
+    el("div", {class:"wrap"},
+      el("section", {class:"hero"},
+        el("div", {class:"eyebrow"}, "Search nearby libraries"),
+        el("h1", {}, "Borrowing made simple"),
+        el("p", {}, "Search and reserve from any Library of Things near you"),
+        el("div", {class:"search-hero"},
+          heroInput,
+          catSelect,
+          distSelect,
+          el("button", {class:"btn", onclick:runSearch}, "Search")
+        )
+      ),
+
+      el("div", {class:"section-head"}, el("h2",{},"Browse by category"), el("button",{class:"link", onclick:()=>{state.query="";state.filterCat=null;state.filterLib=[];go("results");}}, "See all items →")),
+      el("div", {class:"cat-grid"},
+        ...CATEGORIES.map(c=>{
+          const n = ITEMS.filter(i=>i.category===c.key).length;
+          return el("button", {class:"cat", onclick:()=>{ state.query=""; state.filterCat=c.key; state.filterLib=[]; go("results"); }},
+            el("div",{class:"name"}, c.name),
+            el("div",{class:"count"}, n+" item"+(n===1?"":"s"))
+          );
+        })
+      ),
+
+      el("div", {class:"section-head"}, el("h2",{},"Libraries near you"), null),
+      el("div", {class:"lib-row"},
+        ...nearby.map(([k,l])=> el("div",{class:"lib-card"},
+          el("div",{class:"nm"}, l.name),
+          el("div",{class:"meta"}, l.dist+" mi away"),
+          el("div",{class:"mono"}, l.hours)
+        ))
+      )
+    )
+  );
+}
+
+/* ---------- Item card (shared) ---------- */
+function thumbBg(cat){
+  const map = { office:"#EAF0EE", home:"#EFEAE0", craft:"#F0E7EE", electronics:"#E7EDF2", tools:"#F0ECDF", outdoors:"#E6F0E8" };
+  return map[cat] || "#EEEAE0";
+}
+function monogram(name){
+  const w = name.replace(/[^A-Za-z ]/g,"").trim().split(/\s+/);
+  return (w[0][0] + (w[1] ? w[1][0] : "")).toUpperCase();
+}
+function ItemCard(item){
+  const st = statusOf(item);
+  const inStock = candidateAvail(item).filter(a => a.count > 0);
+  const nearest = inStock.length ? Math.min(...inStock.map(a=>LIBRARIES[a.lib].dist)) : null;
+  const locText = inStock.length
+    ? (inStock.length===1 ? LIBRARIES[inStock[0].lib].name : inStock.length+" libraries nearby")
+    : "Not available nearby";
+  return el("button", {class:"card", onclick:()=>openItem(item.id)},
+    el("div", {class:"thumb", style:`background:${thumbBg(item.category)}`},
+      el("span", {class:"mono-thumb"}, monogram(item.name)),
+      el("span", {class:`badge ${st.cls} avail-tag`}, el("span",{class:"dot"}), st.txt)
+    ),
+    el("div", {class:"card-body"},
+      el("div", {class:"cat-tag"}, item.cat),
+      el("div", {class:"title"}, item.name),
+      el("div", {class:"locs"}, locText),
+      el("div", {class:"card-foot"},
+        el("span", {class:"dist"}, nearest!==null ? nearest.toFixed(1)+" mi" : "—"),
+        el("span", {class:"pill", style:"color:var(--ink);font-weight:700"}, "View →")
+      )
+    )
+  );
+}
+
+/* ---------- Results ---------- */
+function Results(){
+  const items = filteredItems();
+  const title = state.filterCat ? CATEGORIES.find(c=>c.key===state.filterCat).name
+             : state.query ? `“${state.query}”` : "All items";
+
+  const facet = (label, checked, on) => {
+    const cb = el("input", {type:"checkbox", onchange:on});
+    if (checked) cb.checked = true;
+    return el("label", {class:"facet"+(checked?" on":"")}, cb, label);
+  };
+
+  return screenWrap("results",
+    el("div", {class:"wrap"},
+      el("div", {class:"results-top"},
+        el("div", {class:"breadcrumb"},
+          el("button",{onclick:()=>go("home")},"Home"), el("span",{},"›"),
+          el("span",{}, state.filterCat ? "Category" : "Search")
+        ),
+        el("h1", {style:"font-size:28px;margin-top:8px"}, "Results for "+title)
+      ),
+      el("div", {class:"results-layout"},
+        /* filters */
+        el("aside", {class:"filters"},
+          el("div", {class:"filter-group"},
+            el("h4", {}, "Availability"),
+            facet("In stock right now", state.onlyAvailable, (e)=>{ state.onlyAvailable=e.target.checked; go("results"); })
+          ),
+          el("div", {class:"filter-group"},
+            el("h4", {}, "Distance"),
+            ...[2,5,10].map(d => {
+              const cb = el("input",{type:"radio", name:"dist", onchange:()=>{ state.maxDist=d; go("results"); }});
+              if (state.maxDist===d) cb.checked=true;
+              return el("label",{class:"facet"+(state.maxDist===d?" on":"")}, cb, "Within "+d+" mi");
+            })
+          ),
+          el("div", {class:"filter-group"},
+            el("h4", {}, "Location"),
+            ...Object.entries(LIBRARIES).map(([key,l])=>{
+              const checked = state.filterLib.includes(key);
+              return facet(l.name, checked, (e)=>{
+                state.filterLib = e.target.checked
+                  ? [...state.filterLib, key]
+                  : state.filterLib.filter(k=>k!==key);
+                go("results");
+              });
+            })
+          ),
+          el("div", {class:"filter-group"},
+            el("h4", {}, "Category"),
+            ...[{key:null,name:"All categories"},...CATEGORIES].map(c=>{
+              const active = state.filterCat===c.key;
+              const cb = el("input",{type:"radio", name:"cat", onchange:()=>{ state.filterCat=c.key; go("results"); }});
+              if (active) cb.checked=true;
+              return el("label",{class:"facet"+(active?" on":"")}, cb, (c.em?c.em+" ":"")+c.name);
+            })
+          )
+        ),
+        /* grid */
+        el("div", {},
+          el("div", {class:"results-head"},
+            el("div", {class:"count", html:`<b>${items.length}</b> item${items.length===1?"":"s"} found across ${Object.keys(LIBRARIES).length} libraries`}),
+            el("div", {style:"display:flex;gap:8px;align-items:center"},
+              el("span",{class:"badge b-ok", style:"font-size:11px"}, el("span",{class:"dot"}),"Live availability")
+            )
+          ),
+          items.length
+            ? el("div", {class:"grid-items"}, ...items.map(ItemCard))
+            : el("div", {class:"empty"}, el("p",{style:"margin-top:10px;font-weight:600"},"No items match those filters"),
+                el("p",{}, "Try widening the distance or turning off “in stock only”."),
+                el("button",{class:"btn-ghost btn", style:"margin-top:14px", onclick:()=>{ state.onlyAvailable=false; state.maxDist=10; state.filterCat=null; state.filterLib=[]; go("results"); }},"Reset filters"))
+        )
+      )
+    )
+  );
+}
+
+/* ---------- Item Detail ---------- */
+function ItemDetail(){
+  const item = state.currentItem;
+  const st = statusOf(item);
+  const sorted = item.avail.slice().sort((a,b)=> (b.count>0)-(a.count>0) || LIBRARIES[a.lib].dist-LIBRARIES[b.lib].dist);
+
+  const locLine = (a) => {
+    const l = LIBRARIES[a.lib];
+    const badge = a.count===0 ? el("span",{class:"badge b-out"}, "0 available")
+                : a.count===1 ? el("span",{class:"badge b-warn"}, el("span",{class:"dot"}),"1 left")
+                : el("span",{class:"badge b-ok"}, el("span",{class:"dot"}), a.count+" available");
+    const btn = a.count>0
+      ? el("button",{class:"btn btn-sm", onclick:()=>{ state.reserve={lib:a.lib,date:null,step:1,reminders:true}; requireAuth(()=>go("reserve")); }}, "Reserve")
+      : el("button",{class:"btn btn-sm btn-ghost", disabled:"true", onclick:()=>toast("Notify feature coming soon")}, "Notify me");
+    return el("div", {class:"loc-line"},
+      el("div", {class:"li"},
+        el("span",{class:"nm"}, l.name),
+        el("span",{class:"mt"}, l.dist+" mi · "+l.hours)
+      ),
+      el("div", {class:"right"}, badge, btn)
+    );
+  };
+
+  return screenWrap("item",
+    el("div", {class:"wrap detail"},
+      el("div", {class:"breadcrumb"},
+        el("button",{onclick:()=>go("home")},"Home"), el("span",{},"›"),
+        el("button",{onclick:()=>history.length&&go("results")}, "Results"), el("span",{},"›"),
+        el("span",{}, item.name)
+      ),
+      el("div", {class:"detail-grid"},
+        el("div", {class:"detail-media", style:`background:${thumbBg(item.category)}`}, el("span",{class:"mono-thumb lg"}, monogram(item.name))),
+        el("div", {},
+          el("div", {class:"cat-tag mono", style:"color:var(--text-3);text-transform:uppercase;font-size:12px;letter-spacing:.05em"}, item.cat),
+          el("h1", {}, item.name),
+          el("div", {style:"margin-top:12px"}, el("span",{class:`badge ${st.cls}`}, el("span",{class:"dot"}), st.txt + " · " + totalCount(item)+" total nearby")),
+          el("p", {class:"desc"}, item.desc),
+          el("div", {class:"spec-row"},
+            el("div",{class:"spec"}, el("div",{class:"k"},"Loan"), el("div",{class:"v"}, item.fee)),
+            el("div",{class:"spec"}, el("div",{class:"k"},"Deposit"), el("div",{class:"v"}, item.deposit)),
+            el("div",{class:"spec"}, el("div",{class:"k"},"Nearest"), el("div",{class:"v"}, libsInStock(item).length? nearestDist(item).toFixed(1)+" mi":"—"))
+          ),
+          el("div", {class:"avail-panel"},
+            el("div", {class:"ap-head"}, el("span",{},"Availability by library"),
+              el("span",{class:"live"}, el("span",{class:"dot"}), "LIVE")),
+            ...sorted.map(locLine)
+          )
+        )
+      )
+    )
+  );
+}
+
+/* ---------- Reserve flow ---------- */
+function Reserve(){
+  const item = state.currentItem;
+  const r = state.reserve;
+  if (r.days == null || r.days > item.maxLoan) r.days = item.maxLoan;  // default to the max loan
+  const chosenDays = r.days;
+  const inStock = libsInStock(item);
+  const dates = [
+    {d:"THU", n:"10", full:"Thu, Jul 10"},
+    {d:"FRI", n:"11", full:"Fri, Jul 11"},
+    {d:"SAT", n:"12", full:"Sat, Jul 12"},
+    {d:"MON", n:"14", full:"Mon, Jul 14"},
+    {d:"TUE", n:"15", full:"Tue, Jul 15"},
+  ];
+
+  const stepBar = el("div", {class:"steps"},
+    el("div",{class:"step "+(r.step>1?"done":"cur")}, el("span",{class:"n"}, "1"), "Pickup"),
+    el("div",{class:"sep"}),
+    el("div",{class:"step "+(r.step===2?"cur":(r.step>2?"done":""))}, el("span",{class:"n"},"2"), "Confirm")
+  );
+
+  let body;
+  if (r.step === 1){
+    body = el("div", {class:"panel"},
+      el("h2", {}, "Choose pickup library"),
+      el("p", {class:"lead"}, "Only libraries with "+item.name.toLowerCase()+" in stock are shown."),
+      ...inStock.map(a=>{
+        const l = LIBRARIES[a.lib];
+        const sel = r.lib===a.lib;
+        return el("div", {class:"opt"+(sel?" sel":""), onclick:()=>{ state.reserve.lib=a.lib; render(); }},
+          el("div",{class:"radio"}),
+          el("div",{class:"oi"}, el("div",{class:"nm"}, l.name), el("div",{class:"mt"}, l.dist+" mi · "+l.hours)),
+          el("span",{class:"badge "+(a.count===1?"b-warn":"b-ok")}, el("span",{class:"dot"}), a.count===1?"1 left":a.count+" available")
+        );
+      }),
+      el("h2", {style:"margin-top:26px;font-size:18px"}, "Pick up on"),
+      el("div", {class:"date-row"},
+        ...dates.map(d=>{
+          const sel = r.date===d.full;
+          return el("button", {class:"date-btn"+(sel?" sel":""), onclick:()=>{ state.reserve.date=d.full; render(); }},
+            el("div",{class:"d"}, d.d), el("div",{class:"n"}, d.n));
+        })
+      ),
+      el("h2", {style:"margin-top:26px;font-size:18px"}, "Loan length"),
+      el("div", {class:"date-row"},
+        ...loanOptions(item.maxLoan).map(days=>{
+          const sel = chosenDays===days;
+          return el("button", {class:"dur-btn"+(sel?" sel":""), onclick:()=>{ state.reserve.days=days; render(); }},
+            days+(days===1?" day":" days"));
+        })
+      ),
+      el("div", {class:"dur-hint"}, "This item can be borrowed for up to "+item.maxLoan+" days."),
+      el("div", {class:"flow-actions"},
+        el("button",{class:"btn btn-ghost", onclick:()=>go("item")}, "← Back to item"),
+        el("button",{class:"btn", disabled: (!r.lib||!r.date)?"true":null, onclick:()=>{ state.reserve.step=2; render(); }}, "Continue")
+      )
+    );
+  } else {
+    const l = LIBRARIES[r.lib];
+    body = el("div", {class:"panel"},
+      el("h2", {}, "Review your reservation"),
+      el("p", {class:"lead"}, "Confirm the details below. The item is held for you for 24 hours after pickup opens."),
+      el("div", {class:"ticket", style:"box-shadow:none;margin-top:18px"},
+        el("div",{class:"ticket-top"},
+          el("div",{class:"em", style:`background:${thumbBg(item.category)};padding:10px;border-radius:12px`}, el("span",{class:"mono-thumb sm"}, monogram(item.name))),
+          el("div",{}, el("div",{style:"font-weight:700;font-size:18px"}, item.name), el("div",{style:"color:var(--text-2);font-size:14px;margin-top:3px"}, item.fee))
+        ),
+        el("div",{class:"ticket-info"},
+          el("div",{}, el("div",{class:"k"},"Pickup library"), el("div",{class:"v"}, l.name)),
+          el("div",{}, el("div",{class:"k"},"Pickup date"), el("div",{class:"v"}, r.date)),
+          el("div",{}, el("div",{class:"k"},"Loan length"), el("div",{class:"v"}, chosenDays+(chosenDays===1?" day":" days"))),
+          el("div",{}, el("div",{class:"k"},"Return by"), el("div",{class:"v"}, r.date?returnDateStr(r.date, chosenDays):"—")),
+          el("div",{}, el("div",{class:"k"},"Borrower"), el("div",{class:"v"}, state.user.name))
+        )
+      ),
+      el("div", {class:"toggle-row"},
+        el("div", {}, el("div",{class:"t"},"Pickup & return reminders"), el("div",{class:"s"},"Get a text the day before pickup and before it's due back.")),
+        el("button", {class:"switch"+(r.reminders?" on":""), role:"switch", "aria-checked":String(r.reminders), onclick:(e)=>{ state.reserve.reminders=!state.reserve.reminders; render(); }})
+      ),
+      el("div", {class:"flow-actions"},
+        el("button",{class:"btn btn-ghost", onclick:()=>{ state.reserve.step=1; render(); }}, "← Back"),
+        el("button",{class:"btn", onclick:confirmReservation}, "Confirm reservation")
+      )
+    );
+  }
+
+  return screenWrap("reserve", el("div",{class:"wrap flow"}, stepBar, body));
+}
+
+function confirmReservation(){
+  const item = state.currentItem, r = state.reserve;
+  const code = "BI-" + item.id.slice(0,3).toUpperCase() + "-" + (1000 + state.reservations.length*137 % 8999);
+  const days = r.days || item.maxLoan;
+  const resv = { code, item, lib:r.lib, date:r.date, days, returnBy:returnDateStr(r.date, days), reminders:r.reminders };
+  state.reservations.unshift(resv);
+  state.lastReservation = resv;
+  go("confirm");
+}
+
+function cancelReservation(code){
+  state.reservations = state.reservations.filter(r => r.code !== code);
+  state.cancelingCode = null;
+  toast("Reservation cancelled");
+  render();
+}
+
+/* ---------- Confirm ---------- */
+function Confirm(){
+  const resv = state.lastReservation;
+  const item = resv.item, l = LIBRARIES[resv.lib];
+  return screenWrap("confirm",
+    el("div", {class:"wrap flow"},
+      el("div", {class:"confirm-hero"},
+        el("h1", {}, "You're all set, "+state.user.name.split(" ")[0]+"!"),
+        el("p", {}, item.name+" is reserved at "+l.name+". Show this code at the desk to pick it up.")
+      ),
+      el("div", {class:"ticket"},
+        el("div",{class:"ticket-top"},
+          el("div",{class:"em", style:`background:${thumbBg(item.category)};padding:12px;border-radius:12px`}, el("span",{class:"mono-thumb sm"}, monogram(item.name))),
+          el("div",{}, el("div",{style:"font-weight:700;font-size:19px"}, item.name), el("div",{style:"color:var(--text-2);font-size:14px;margin-top:3px"}, item.fee))
+        ),
+        el("div",{class:"ticket-code"},
+          el("div",{}, el("div",{class:"lbl"},"Reservation code"), el("div",{class:"code"}, resv.code)),
+        ),
+        el("div",{class:"ticket-info"},
+          el("div",{}, el("div",{class:"k"},"Pickup library"), el("div",{class:"v"}, l.name)),
+          el("div",{}, el("div",{class:"k"},"Pickup date"), el("div",{class:"v"}, resv.date)),
+          el("div",{}, el("div",{class:"k"},"Loan length"), el("div",{class:"v"}, resv.days+(resv.days===1?" day":" days"))),
+          el("div",{}, el("div",{class:"k"},"Return by"), el("div",{class:"v"}, resv.returnBy)),
+        )
+      ),
+      el("div", {class:"flow-actions", style:"justify-content:center;gap:12px"},
+        el("button",{class:"btn btn-ghost", onclick:()=>go("home")}, "Search for more"),
+        el("button",{class:"btn", onclick:()=>go("reservations")}, "View my reservations")
+      )
+    )
+  );
+}
+
+/* ---------- My Reservations ---------- */
+function MyReservations(){
+  return screenWrap("reservations",
+    el("div", {class:"wrap resv"},
+      el("h1", {}, "My reservations"),
+      el("p", {class:"sub"}, "Signed in as "+state.user.email),
+      state.reservations.length
+        ? el("div", {class:"resv-list"},
+            ...state.reservations.map(r=>{
+              const l = LIBRARIES[r.lib];
+              const confirming = state.cancelingCode === r.code;
+              return el("div", {class:"resv-card"+(confirming?" confirming":"")},
+                el("div",{class:"em", style:`background:${thumbBg(r.item.category)};padding:8px;border-radius:12px`}, el("span",{class:"mono-thumb sm"}, monogram(r.item.name))),
+                el("div",{class:"info"},
+                  el("div",{class:"nm"}, r.item.name),
+                  el("div",{class:"mt"}, l.name+" · pickup "+r.date),
+                  el("div",{class:"mt"}, r.days+(r.days===1?" day":" days")+" loan · return by "+r.returnBy)
+                ),
+                confirming
+                  ? el("div",{class:"cancel-confirm"},
+                      el("span",{class:"cc-q"}, "Cancel this reservation?"),
+                      el("button",{class:"btn btn-sm btn-ghost", onclick:()=>cancelReservation(r.code)}, "Yes, cancel"),
+                      el("button",{class:"btn btn-sm btn-danger", onclick:()=>{ state.cancelingCode=null; render(); }}, "Keep")
+                    )
+                  : el("div",{class:"resv-right"},
+                      el("div",{class:"rc"}, r.code),
+                      el("div",{class:"badge b-ok", style:"margin-top:6px"}, el("span",{class:"dot"}),"Reserved"),
+                      el("button",{class:"link-cancel", onclick:()=>{ state.cancelingCode=r.code; render(); }}, "Cancel")
+                    )
+              );
+            })
+          )
+        : el("div", {class:"empty"},
+            el("p",{style:"margin-top:12px;font-weight:600;color:var(--text)"},"No reservations yet"),
+            el("p",{},"Find something you need and reserve it. It'll show up here."),
+            el("button",{class:"btn", style:"margin-top:16px", onclick:()=>go("home")},"Start searching")
+          )
+    )
+  );
+}
+
+/* ---------- Footer ---------- */
+function Footer(){
+  return el("footer", {class:"footer"},
+    el("div", {class:"footer-inner"},
+      el("span", {}, "BorrowIt from the Library of Things · CS5340 · Katherine Nie"),
+      el("span", {}, "Illustrative data. Availability and libraries are simulated for demo purposes.")
+    )
+  );
+}
+
+/* close the user menu on any outside click */
+document.addEventListener("click", ()=>{ if (state.menuOpen){ state.menuOpen = false; render(); } });
+
+render();
+</script>
