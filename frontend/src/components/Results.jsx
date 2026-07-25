@@ -1,0 +1,134 @@
+import { useApp } from '../AppContext'
+import { filteredItems } from '../helpers'
+import ItemCard from './ItemCard'
+
+function Facet({ label, checked, onChange, type = 'checkbox', name }) {
+  return (
+    <label className={'facet' + (checked ? ' on' : '')}>
+      <input type={type} name={name} checked={checked} onChange={onChange} />
+      {label}
+    </label>
+  )
+}
+
+export default function Results() {
+  const {
+    items, libraries, categories, go,
+    query, filterCat, setFilterCat, filterLib, setFilterLib,
+    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist,
+  } = useApp()
+
+  const list = filteredItems(items, { query, filterCat, filterLib, onlyAvailable, maxDist }, libraries)
+  const title = filterCat
+    ? categories.find((c) => c.key === filterCat)?.name
+    : query
+    ? `“${query}”`
+    : 'All items'
+
+  const toggleLib = (key, checked) => {
+    setFilterLib(checked ? [...filterLib, key] : filterLib.filter((k) => k !== key))
+  }
+
+  const resetFilters = () => {
+    setOnlyAvailable(false)
+    setMaxDist(10)
+    setFilterCat(null)
+    setFilterLib([])
+  }
+
+  const catOptions = [{ key: null, name: 'All categories', em: '' }, ...categories]
+
+  return (
+    <div className="screen active" id="results">
+      <div className="wrap">
+        <div className="results-top">
+          <div className="breadcrumb">
+            <button onClick={() => go('home')}>Home</button>
+            <span>›</span>
+            <span>{filterCat ? 'Category' : 'Search'}</span>
+          </div>
+          <h1 style={{ fontSize: 28, marginTop: 8 }}>Results for {title}</h1>
+        </div>
+        <div className="results-layout">
+          <aside className="filters">
+            <div className="filter-group">
+              <h4>Availability</h4>
+              <Facet
+                label="In stock right now"
+                checked={onlyAvailable}
+                onChange={(e) => setOnlyAvailable(e.target.checked)}
+              />
+            </div>
+            <div className="filter-group">
+              <h4>Distance</h4>
+              {[2, 5, 10].map((d) => (
+                <Facet
+                  key={d}
+                  type="radio"
+                  name="dist"
+                  label={'Within ' + d + ' mi'}
+                  checked={maxDist === d}
+                  onChange={() => setMaxDist(d)}
+                />
+              ))}
+            </div>
+            <div className="filter-group">
+              <h4>Location</h4>
+              {Object.entries(libraries).map(([key, l]) => (
+                <Facet
+                  key={key}
+                  label={l.name}
+                  checked={filterLib.includes(key)}
+                  onChange={(e) => toggleLib(key, e.target.checked)}
+                />
+              ))}
+            </div>
+            <div className="filter-group">
+              <h4>Category</h4>
+              {catOptions.map((c) => (
+                <Facet
+                  key={c.key ?? 'all'}
+                  type="radio"
+                  name="cat"
+                  label={(c.em ? c.em + ' ' : '') + c.name}
+                  checked={filterCat === c.key}
+                  onChange={() => setFilterCat(c.key)}
+                />
+              ))}
+            </div>
+          </aside>
+
+          <div>
+            <div className="results-head">
+              <div className="count">
+                <b>{list.length}</b> item{list.length === 1 ? '' : 's'} found across{' '}
+                {Object.keys(libraries).length} libraries
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="badge b-ok" style={{ fontSize: 11 }}>
+                  <span className="dot" />
+                  Live availability
+                </span>
+              </div>
+            </div>
+            {list.length ? (
+              <div className="grid-items">
+                {list.map((item) => (
+                  <ItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="empty">
+                <p style={{ marginTop: 10, fontWeight: 600 }}>No items match those filters</p>
+                <p>Try widening the distance or turning off “in stock only”.</p>
+                <button className="btn-ghost btn" style={{ marginTop: 14 }} onClick={resetFilters}>
+                  Reset filters
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

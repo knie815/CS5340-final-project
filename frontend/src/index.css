@@ -1,0 +1,12 @@
+/* Global resets only. Component styles live in App.css. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
