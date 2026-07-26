@@ -61,7 +61,9 @@ export default function App() {
   return (
     <>
       <TopBar />
-      <Screen />
+      <main className="app-main">
+        <Screen />
+      </main>
       <Footer />
       <Toast />
     </>

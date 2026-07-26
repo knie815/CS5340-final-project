@@ -7,6 +7,13 @@ body {
   margin: 0;
 }
 
+/* Full-height flex column so the footer sits at the bottom of the viewport
+   (no trailing gap) when page content is shorter than the screen. */
 #root {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app-main {
+  flex: 1 0 auto;
 }

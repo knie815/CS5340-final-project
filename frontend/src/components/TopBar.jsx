@@ -62,7 +62,7 @@ export default function TopBar() {
               )}
             </div>
           ) : (
-            <button className="nav-btn" onClick={() => go('signin')}>
+            <button className="nav-btn primary" onClick={() => go('signin')}>
               Sign in
             </button>
           )}

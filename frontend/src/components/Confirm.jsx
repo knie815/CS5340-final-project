@@ -1,5 +1,5 @@
 import { useApp } from '../AppContext'
-import { thumbBg, monogram } from '../helpers'
+import { thumbBg, monogram, formatDate, loanLabel } from '../helpers'
 
 export default function Confirm() {
   const { lastReservation: resv, libraries, go, user } = useApp()
@@ -39,15 +39,15 @@ export default function Confirm() {
             </div>
             <div>
               <div className="k">Pickup date</div>
-              <div className="v">{resv.date}</div>
+              <div className="v">{formatDate(resv.date)}</div>
             </div>
             <div>
               <div className="k">Loan length</div>
-              <div className="v">{resv.days + (resv.days === 1 ? ' day' : ' days')}</div>
+              <div className="v">{loanLabel(resv.days)}</div>
             </div>
             <div>
               <div className="k">Return by</div>
-              <div className="v">{resv.returnBy}</div>
+              <div className="v">{resv.days === 0 ? formatDate(resv.date) + ' (same day)' : formatDate(resv.returnBy)}</div>
             </div>
           </div>
         </div>

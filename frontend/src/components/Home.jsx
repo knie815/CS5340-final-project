@@ -4,7 +4,7 @@ import { useApp } from '../AppContext'
 export default function Home() {
   const {
     items, libraries, categories, maxDist,
-    setQuery, setFilterCat, setFilterLib, setMaxDist, go,
+    setQuery, setFilterCat, setFilterLib, setMaxDist, go, browseLibrary,
   } = useApp()
 
   const [heroQuery, setHeroQuery] = useState('')
@@ -108,11 +108,16 @@ export default function Home() {
         </div>
         <div className="lib-row">
           {nearby.map(([k, l]) => (
-            <div key={k} className="lib-card">
+            <button
+              key={k}
+              className="lib-card"
+              style={{ textAlign: 'left', cursor: 'pointer' }}
+              onClick={() => browseLibrary(k)}
+            >
               <div className="nm">{l.name}</div>
               <div className="meta">{l.dist} mi away</div>
               <div className="mono">{l.hours}</div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

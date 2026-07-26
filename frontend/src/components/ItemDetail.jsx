@@ -2,45 +2,34 @@ import { useApp } from '../AppContext'
 import { statusOf, totalCount, libsInStock, nearestDist, thumbBg, monogram } from '../helpers'
 
 export default function ItemDetail() {
-  const { currentItem: item, libraries, go, setReserve, requireAuth, toast } = useApp()
+  const { currentItem: item, libraries, go, setReserve, requireAuth } = useApp()
   if (!item) return null
 
   const st = statusOf(item)
+  // Only libraries that actually hold copies of this item (capacity > 0).
   const sorted = item.avail
-    .slice()
+    .filter((a) => a.capacity > 0)
     .sort((a, b) => (b.count > 0) - (a.count > 0) || libraries[a.lib].dist - libraries[b.lib].dist)
 
   const LocLine = ({ a }) => {
     const l = libraries[a.lib]
-    const badge =
-      a.count === 0 ? (
-        <span className="badge b-out">0 available</span>
-      ) : a.count === 1 ? (
-        <span className="badge b-warn">
-          <span className="dot" />1 left
-        </span>
-      ) : (
-        <span className="badge b-ok">
-          <span className="dot" />
-          {a.count} available
-        </span>
-      )
-    const btn =
-      a.count > 0 ? (
-        <button
-          className="btn btn-sm"
-          onClick={() => {
-            setReserve({ lib: a.lib, date: null, step: 1, reminders: true, days: null })
-            requireAuth(() => go('reserve'))
-          }}
-        >
-          Reserve
-        </button>
-      ) : (
-        <button className="btn btn-sm btn-ghost" disabled onClick={() => toast('Notify feature coming soon')}>
-          Notify me
-        </button>
-      )
+    const badge = (
+      <span className={'badge ' + (a.count > 0 ? 'b-ok' : 'b-warn')}>
+        <span className="dot" />
+        {a.count} available today
+      </span>
+    )
+    const btn = (
+      <button
+        className="btn btn-sm"
+        onClick={() => {
+          setReserve({ lib: a.lib, start: null, end: null, step: 1, reminders: true })
+          requireAuth(() => go('reserve'))
+        }}
+      >
+        Reserve
+      </button>
+    )
     return (
       <div className="loc-line">
         <div className="li">
@@ -103,14 +92,16 @@ export default function ItemDetail() {
             <div className="avail-panel">
               <div className="ap-head">
                 <span>Availability by library</span>
-                <span className="live">
-                  <span className="dot" />
-                  LIVE
-                </span>
               </div>
-              {sorted.map((a) => (
-                <LocLine key={a.lib} a={a} />
-              ))}
+              {sorted.length ? (
+                sorted.map((a) => <LocLine key={a.lib} a={a} />)
+              ) : (
+                <div className="loc-line">
+                  <div className="li">
+                    <span className="mt">No libraries currently carry this item.</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

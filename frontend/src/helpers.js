@@ -42,12 +42,72 @@ export function loanOptions(maxLoan) {
   return opts
 }
 
-// Return date string from a pickup label like "Mon, Jul 14" plus N days (demo: stays within July).
-export function returnDateStr(pickupLabel, days) {
-  const parts = pickupLabel.split(' ')
-  const month = parts[parts.length - 2] // "Jul"
-  const day = parseInt(parts[parts.length - 1], 10)
-  return month + ' ' + (day + days)
+// ---- Real calendar dates (fixes the past-date / no-year / invalid-date bugs) ----
+
+const pad = (n) => String(n).padStart(2, '0')
+export function isoOf(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// The next `count` calendar days starting tomorrow, as pickup options.
+export function upcomingDates(count = 5) {
+  const out = []
+  const base = new Date()
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i)
+    out.push({
+      iso: isoOf(d),
+      dow: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+      day: String(d.getDate()),
+    })
+  }
+  return out
+}
+
+// ISO yyyy-mm-dd + N days -> ISO yyyy-mm-dd (real calendar arithmetic).
+export function addDaysISO(iso, n) {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return isoOf(d)
+}
+
+// ISO yyyy-mm-dd -> "Thu, Jul 10, 2026". Falls back to the raw value if unparseable.
+export function formatDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso + 'T00:00:00')
+  if (isNaN(d)) return iso
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+export function todayISO() {
+  return isoOf(new Date())
+}
+
+// Whole days from ISO date a to ISO date b (b - a).
+export function diffDaysISO(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000)
+}
+
+// A calendar month laid out as flat cells (leading/trailing blanks are null).
+// monthIndex is 0-based (0 = January).
+export function monthGrid(year, monthIndex) {
+  const first = new Date(year, monthIndex, 1)
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < first.getDay(); i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(isoOf(new Date(year, monthIndex, d)))
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
+export function monthLabel(year, monthIndex) {
+  return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+// Human loan-length label. 0 days = a same-day (day-use) loan.
+export function loanLabel(days) {
+  if (days === 0) return 'Same-day'
+  return days + (days === 1 ? ' day' : ' days')
 }
 
 const THUMB_BG = {

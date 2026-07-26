@@ -54,23 +54,29 @@ export default function Results() {
             <div className="filter-group">
               <h4>Availability</h4>
               <Facet
-                label="In stock right now"
+                label="In stock"
                 checked={onlyAvailable}
                 onChange={(e) => setOnlyAvailable(e.target.checked)}
               />
             </div>
             <div className="filter-group">
               <h4>Distance</h4>
-              {[2, 5, 10].map((d) => (
-                <Facet
-                  key={d}
-                  type="radio"
-                  name="dist"
-                  label={'Within ' + d + ' mi'}
-                  checked={maxDist === d}
-                  onChange={() => setMaxDist(d)}
+              <div className="dist-slider">
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  value={maxDist}
+                  aria-label="Maximum distance in miles"
+                  onChange={(e) => setMaxDist(Number(e.target.value))}
                 />
-              ))}
+                <div className="dist-scale">
+                  <span>1 mi</span>
+                  <span>10 mi</span>
+                </div>
+                <div className="dist-value">Within {maxDist} mi</div>
+              </div>
             </div>
             <div className="filter-group">
               <h4>Location</h4>
@@ -103,12 +109,6 @@ export default function Results() {
               <div className="count">
                 <b>{list.length}</b> item{list.length === 1 ? '' : 's'} found across{' '}
                 {Object.keys(libraries).length} libraries
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span className="badge b-ok" style={{ fontSize: 11 }}>
-                  <span className="dot" />
-                  Live availability
-                </span>
               </div>
             </div>
             {list.length ? (

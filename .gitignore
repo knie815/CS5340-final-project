@@ -3,6 +3,8 @@ assignment_reports/
 
 # Python / Flask
 backend/venv/
+backend/borrowit.db
+backend/instance/
 __pycache__/
 *.pyc
 

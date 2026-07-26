@@ -1,8 +1,7 @@
-"""Seed data for the Library of Things API.
+"""Seed data for the Library of Things catalog.
 
-Lifted verbatim from the prototype (prototype/library-of-things.html). This is
-the in-memory source of truth for step 1; it will be replaced by SQLite +
-SQLAlchemy once the read endpoints are wired to the React frontend.
+Consumed once by seed.py to populate the SQLite database on first run (or after the DB is
+deleted). Not read at runtime — the API reads from borrowit.db.
 
 availability: list of {lib, count} -> count > 1 ok, == 1 warn (last one), == 0 out
 """
@@ -19,7 +18,7 @@ ITEMS = [
     {"id": "laminator", "name": "Laminator (A3)", "em": "📇", "cat": "Office", "category": "office",
      "desc": "Thermal A3 laminator with adjustable temperature. Great for classroom materials, signage, and preserving documents. Warms up in about 4 minutes.",
      "fee": "Max 7-day loan", "maxLoan": 7, "deposit": "No deposit",
-     "avail": [{"lib": "central", "count": 2}, {"lib": "somerv", "count": 1}, {"lib": "newton", "count": 0}]},
+     "avail": [{"lib": "central", "count": 2}, {"lib": "somerv", "count": 1}, {"lib": "newton", "count": 1}]},
     {"id": "carpet", "name": "Carpet Cleaner", "em": "🧼", "cat": "Home", "category": "home",
      "desc": "Deep-clean carpet and upholstery washer with two tanks and a stair attachment. Includes a sample of cleaning solution.",
      "fee": "Max 3-day loan", "maxLoan": 3, "deposit": "$20 deposit",
@@ -31,7 +30,7 @@ ITEMS = [
     {"id": "drill", "name": "Cordless Drill Kit", "em": "🔩", "cat": "Tools", "category": "tools",
      "desc": "18V cordless drill/driver with two batteries, charger, and a 40-piece bit set in a hard case.",
      "fee": "Max 7-day loan", "maxLoan": 7, "deposit": "No deposit",
-     "avail": [{"lib": "medford", "count": 4}, {"lib": "central", "count": 0}, {"lib": "somerv", "count": 0}]},
+     "avail": [{"lib": "medford", "count": 4}, {"lib": "central", "count": 1}, {"lib": "somerv", "count": 1}]},
     {"id": "projector", "name": "Portable Projector", "em": "📽️", "cat": "Electronics", "category": "electronics",
      "desc": "1080p portable projector with HDMI, USB-C, and built-in speaker. Ideal for movie nights and presentations.",
      "fee": "Max 5-day loan", "maxLoan": 5, "deposit": "No deposit",
@@ -39,7 +38,7 @@ ITEMS = [
     {"id": "telescope", "name": "Telescope", "em": "🔭", "cat": "Outdoors", "category": "outdoors",
      "desc": "70mm refractor telescope with tripod and two eyepieces. Comes with a beginner star-gazing guide.",
      "fee": "Max 14-day loan", "maxLoan": 14, "deposit": "No deposit",
-     "avail": [{"lib": "newton", "count": 2}, {"lib": "central", "count": 0}]},
+     "avail": [{"lib": "newton", "count": 2}, {"lib": "central", "count": 1}]},
     {"id": "pressure", "name": "Pressure Washer", "em": "💦", "cat": "Tools", "category": "tools",
      "desc": "Electric 2000 PSI pressure washer for patios, decks, and driveways. Includes three nozzle tips.",
      "fee": "Max 3-day loan", "maxLoan": 3, "deposit": "$20 deposit",
@@ -51,7 +50,7 @@ ITEMS = [
     {"id": "gopro", "name": "Action Camera", "em": "📸", "cat": "Electronics", "category": "electronics",
      "desc": "Waterproof 4K action camera with chest and helmet mounts and two batteries. Great for trips and events.",
      "fee": "Max 5-day loan", "maxLoan": 5, "deposit": "$30 deposit",
-     "avail": [{"lib": "bostonpl", "count": 0}, {"lib": "newton", "count": 0}]},
+     "avail": [{"lib": "bostonpl", "count": 1}, {"lib": "newton", "count": 1}]},
 ]
 
 CATEGORIES = [

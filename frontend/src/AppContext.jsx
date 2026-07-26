@@ -1,38 +1,76 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { getItems, getLibraries, getCategories } from './api'
-import { returnDateStr } from './helpers'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  getItems, getLibraries, getCategories, getReservations,
+  createReservation, cancelReservationApi, notifyRequest,
+} from './api'
+import { diffDaysISO } from './helpers'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
 
-const USER = { name: 'Katherine Nie', initials: 'KN', email: 'katherine.nie@xxxxx.com' }
+const USER = { name: 'Katherine Nie', initials: 'KN', email: 'katherine.nie@example.com' }
 
 export function AppProvider({ children }) {
   // ---- API data ----
   const [items, setItems] = useState([])
   const [libraries, setLibraries] = useState({})
   const [categories, setCategories] = useState([])
+  const [reservations, setReservations] = useState([])
   const [dataStatus, setDataStatus] = useState('loading') // loading | ready | error
 
+  const refreshItems = useCallback(() => getItems().then(setItems), [])
+  const refreshReservations = useCallback(() => getReservations().then(setReservations), [])
+
   useEffect(() => {
-    Promise.all([getItems(), getLibraries(), getCategories()])
-      .then(([i, l, c]) => {
+    Promise.all([getItems(), getLibraries(), getCategories(), getReservations()])
+      .then(([i, l, c, r]) => {
         setItems(i)
         setLibraries(l)
         setCategories(c)
+        setReservations(r)
         setDataStatus('ready')
       })
       .catch(() => setDataStatus('error'))
   }, [])
 
-  // ---- navigation ----
+  // ---- navigation (synced with the browser History API for back/forward) ----
   const [screen, setScreen] = useState('home')
   const [cancelingCode, setCancelingCode] = useState(null)
-  const go = useCallback((s) => {
+  // Which item the detail/reserve screens are showing. A ref mirrors the state so
+  // go()/history can read it synchronously when pushing an entry.
+  const [currentItemId, setCurrentItemId] = useState(null)
+  const currentItemIdRef = useRef(null)
+  const setItemId = useCallback((id) => {
+    currentItemIdRef.current = id
+    setCurrentItemId(id)
+  }, [])
+
+  // Apply a screen change without touching history (used by go() and popstate).
+  const applyScreen = useCallback((s) => {
     setScreen(s)
     setCancelingCode(null)
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [])
+
+  const go = useCallback(
+    (s) => {
+      applyScreen(s)
+      window.history.pushState({ screen: s, itemId: currentItemIdRef.current }, '')
+    },
+    [applyScreen]
+  )
+
+  // Seed the initial entry and respond to browser back/forward.
+  useEffect(() => {
+    window.history.replaceState({ screen: 'home', itemId: null }, '')
+    const onPop = (e) => {
+      const st = e.state || { screen: 'home', itemId: null }
+      if (st.itemId) setItemId(st.itemId)
+      applyScreen(st.screen || 'home')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [applyScreen, setItemId])
 
   // ---- toast ----
   const [toastMsg, setToastMsg] = useState('')
@@ -41,7 +79,7 @@ export function AppProvider({ children }) {
     setToastMsg(msg)
     setToastShow(true)
     clearTimeout(toast._t)
-    toast._t = setTimeout(() => setToastShow(false), 2200)
+    toast._t = setTimeout(() => setToastShow(false), 2400)
   }, [])
 
   // ---- auth (mocked) ----
@@ -63,7 +101,7 @@ export function AppProvider({ children }) {
   const signIn = useCallback(
     (msg) => {
       setAuthed(true)
-      if (msg) toast(msg)
+      toast(msg || 'Signed in')
       const next = afterAuth
       setAfterAuth(null)
       if (next) next()
@@ -96,51 +134,92 @@ export function AppProvider({ children }) {
     [go]
   )
 
+  // Jump to results filtered to a single library (clickable "Libraries near you").
+  const browseLibrary = useCallback(
+    (key) => {
+      setQuery('')
+      setFilterCat(null)
+      setFilterLib([key])
+      go('results')
+    },
+    [go]
+  )
+
   // ---- item detail + reserve flow ----
-  const [currentItem, setCurrentItem] = useState(null)
-  const [reserve, setReserve] = useState({ lib: null, date: null, step: 1, reminders: true, days: null })
+  // currentItemId is declared with the navigation state above; derive the object
+  // from the live items list so availability stays current after a refetch.
+  const currentItem = useMemo(
+    () => items.find((i) => i.id === currentItemId) || null,
+    [items, currentItemId]
+  )
+  const [reserve, setReserve] = useState({ lib: null, start: null, end: null, step: 1, reminders: true })
+
+  // Prefer a library that carries the item (capacity > 0), favouring one with
+  // copies free today. Future dates are still reservable at booked-today libs.
+  const pickDefaultLib = (item) => {
+    if (!item) return null
+    const carried = item.avail.filter((a) => a.capacity > 0)
+    const freeToday = carried.find((a) => a.count > 0)
+    return (freeToday || carried[0])?.lib || null
+  }
 
   const openItem = useCallback(
     (id) => {
       const item = items.find((i) => i.id === id)
-      setCurrentItem(item)
-      const inStock = item.avail.filter((a) => a.count > 0)
-      setReserve({ lib: inStock.length ? inStock[0].lib : null, date: null, step: 1, reminders: true, days: null })
+      setItemId(id)
+      setReserve({ lib: pickDefaultLib(item), start: null, end: null, step: 1, reminders: true })
       go('item')
     },
-    [items, go]
+    [items, go, setItemId]
   )
 
-  // ---- reservations (in-memory until SQLite) ----
-  const [reservations, setReservations] = useState([])
+  // ---- reservations (persisted in SQLite via the API) ----
   const [lastReservation, setLastReservation] = useState(null)
 
-  const confirmReservation = useCallback(() => {
+  const confirmReservation = useCallback(async () => {
     const item = currentItem
-    const r = reserve
-    const code = 'BI-' + item.id.slice(0, 3).toUpperCase() + '-' + (1000 + ((reservations.length * 137) % 8999))
-    const days = r.days || item.maxLoan
-    const resv = {
-      code,
-      item,
-      lib: r.lib,
-      date: r.date,
-      days,
-      returnBy: returnDateStr(r.date, days),
-      reminders: r.reminders,
+    if (!item || !reserve.start || !reserve.end) return
+    try {
+      const resv = await createReservation({
+        item_id: item.id,
+        lib: reserve.lib,
+        pickup_date: reserve.start, // ISO yyyy-mm-dd
+        days: diffDaysISO(reserve.start, reserve.end),
+        reminders: reserve.reminders,
+      })
+      setLastReservation(resv)
+      await Promise.all([refreshItems(), refreshReservations()])
+      go('confirm')
+    } catch (err) {
+      toast(err.message || 'Could not complete reservation')
     }
-    setReservations((prev) => [resv, ...prev])
-    setLastReservation(resv)
-    go('confirm')
-  }, [currentItem, reserve, reservations.length, go])
+  }, [currentItem, reserve, refreshItems, refreshReservations, go, toast])
 
   const cancelReservation = useCallback(
-    (code) => {
-      setReservations((prev) => prev.filter((r) => r.code !== code))
-      setCancelingCode(null)
-      toast('Reservation cancelled')
+    async (code) => {
+      try {
+        await cancelReservationApi(code)
+        await Promise.all([refreshItems(), refreshReservations()])
+        setCancelingCode(null)
+        toast('Reservation cancelled')
+      } catch (err) {
+        toast(err.message || 'Could not cancel reservation')
+      }
     },
-    [toast]
+    [refreshItems, refreshReservations, toast]
+  )
+
+  const notify = useCallback(
+    async (itemId, lib) => {
+      try {
+        await notifyRequest({ item_id: itemId, lib, email: USER.email })
+        const libName = libraries[lib]?.name || 'that library'
+        toast(`We'll email you when it's back at ${libName}`)
+      } catch (err) {
+        toast(err.message || 'Could not set up notification')
+      }
+    },
+    [libraries, toast]
   )
 
   const value = {
@@ -149,10 +228,10 @@ export function AppProvider({ children }) {
     toastMsg, toastShow, toast,
     authed, menuOpen, setMenuOpen, requireAuth, signIn, logOut,
     query, setQuery, filterCat, setFilterCat, filterLib, setFilterLib,
-    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist, search,
+    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist, search, browseLibrary,
     currentItem, openItem, reserve, setReserve,
     reservations, lastReservation, confirmReservation,
-    cancelingCode, setCancelingCode, cancelReservation,
+    cancelingCode, setCancelingCode, cancelReservation, notify,
     user: USER,
   }
 

@@ -3,10 +3,13 @@
 **Library of Things digital platform.** Search and reserve tools, appliances, and
 other items from partner libraries near you.
 
-- **backend/** — Flask REST API serving the catalog (items, libraries, categories).
-  In-memory seed data for now (`data.py`); SQLite + SQLAlchemy comes in a later step.
+- **backend/** — Flask REST API backed by **SQLite (SQLAlchemy)**. Serves the catalog
+  and manages reservations against live stock: reserving decrements availability,
+  cancelling restores it. The DB (`backend/borrowit.db`) is created and seeded from
+  `data.py` automatically on first run.
 - **frontend/** — React app (Vite) that fetches from the API and renders every screen
-  (home, results, item detail, reserve flow, confirmation, my reservations).
+  (home, results, item detail, reserve flow, confirmation, my reservations). It refetches
+  after each reservation/cancellation so availability stays live across all screens.
 - **prototype/** — the original single-file HTML prototype, kept for reference.
 
 In development the Vite dev server proxies `/api/*` to Flask on port 5000, so the
@@ -124,16 +127,23 @@ cd frontend && npm run preview
 
 ## API endpoints
 
-| Method | Path                 | Description                    |
-| ------ | -------------------- | ------------------------------ |
-| GET    | `/api/health`        | Liveness check                 |
-| GET    | `/api/items`         | All catalog items              |
-| GET    | `/api/items/<id>`    | Single item (404 if not found) |
-| GET    | `/api/libraries`     | Library locations              |
-| GET    | `/api/categories`    | Item categories                |
+| Method | Path                              | Description                                                   |
+| ------ | --------------------------------- | ------------------------------------------------------------- |
+| GET    | `/api/health`                     | Liveness check                                                |
+| GET    | `/api/items`                      | All catalog items (with live per-library availability)        |
+| GET    | `/api/items/<id>`                 | Single item (404 if not found)                                |
+| GET    | `/api/libraries`                  | Library locations                                             |
+| GET    | `/api/categories`                 | Item categories                                               |
+| GET    | `/api/reservations`               | All reservations; optional `?status=reserved\|cancelled`      |
+| POST   | `/api/reservations`               | Create a reservation — **decrements stock** (400 past date, 409 out of stock) |
+| POST   | `/api/reservations/<code>/cancel` | Cancel a reservation — **restores stock** (idempotent)        |
+| POST   | `/api/notify`                     | Register interest in an out-of-stock item                     |
 
-> Reservations are currently held in the browser (React state). Persisted
-> reservation endpoints arrive with the SQLite step.
+**Reservation create body:** `{ "item_id", "lib", "pickup_date" (ISO yyyy-mm-dd), "days", "reminders" }`
+
+> Reservations are persisted in SQLite. Stock is decremented on reserve and restored
+> on cancel; cancelled reservations remain as history. To reset all data, delete
+> `backend/borrowit.db` — it will be re-seeded on the next run.
 
 ---
 
