@@ -7,19 +7,28 @@ some already-booked / grayed-out periods out of the box.
 
 from datetime import date, timedelta
 
+from werkzeug.security import generate_password_hash
+
 import seed_data
 from extensions import db
-from models import Availability, Category, Item, Library, Reservation
+from models import Availability, Category, Item, Library, Reservation, User
 
-# Reservations booked by "other people" — they consume capacity (and so gray out
-# calendar dates) but don't appear in the current user's My Reservations list.
-COMMUNITY_EMAIL = "community@demo"
+# The single demo account. Its card number also owns the demo reservations below.
+DEMO_CARD = "1001"
 
-# (item, library with capacity 1, days from today, loan length) -> fully-booked range.
+# Seeded as this account's reservations so My Reservations shows one of each
+# lifecycle state on first run.
+# (item, library, pickup offset from today, loan days, status)
 DEMO_RESERVATIONS = [
-    ("pressure", "medford", 0, 4),
-    ("carpet", "medford", 1, 3),
-    ("soldering", "central", 2, 5),
+    ("laminator", "central", -2, 5, "reserved"),   # currently borrowed (started, not yet returned)
+    ("carpet", "medford", 3, 3, "reserved"),        # upcoming
+    ("telescope", "newton", 9, 6, "reserved"),      # upcoming
+    ("soldering", "central", 2, 4, "cancelled"),    # cancelled
+]
+
+# Demo library-card logins: (card_number, password, name, library).
+DEMO_USERS = [
+    (DEMO_CARD, "borrow123", "Katherine Nie", "central"),
 ]
 
 
@@ -45,11 +54,12 @@ def seed_if_empty():
 
     db.session.commit()
     _seed_demo_reservations()
+    _seed_demo_users()
 
 
 def _seed_demo_reservations():
     today = date.today()
-    for i, (item_id, lib, offset, days) in enumerate(DEMO_RESERVATIONS):
+    for i, (item_id, lib, offset, days, status) in enumerate(DEMO_RESERVATIONS):
         pickup = today + timedelta(days=offset)
         return_ = pickup + timedelta(days=days)
         db.session.add(
@@ -57,7 +67,18 @@ def _seed_demo_reservations():
                 code=f"BI-{item_id[:3].upper()}-{900 + i}",
                 item_id=item_id, lib_key=lib,
                 pickup_date=pickup.isoformat(), days=days, return_date=return_.isoformat(),
-                reminders=False, status="reserved", user_email=COMMUNITY_EMAIL,
+                reminders=False, status=status, user_email=DEMO_CARD,
+            )
+        )
+    db.session.commit()
+
+
+def _seed_demo_users():
+    for card, password, name, lib in DEMO_USERS:
+        db.session.add(
+            User(
+                card_number=card, password_hash=generate_password_hash(password),
+                name=name, lib_key=lib,
             )
         )
     db.session.commit()

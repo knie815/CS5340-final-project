@@ -16,13 +16,12 @@ from datetime import date, timedelta
 from flask import Flask, abort, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from extensions import db
-from models import Availability, Category, Item, Library, NotifyRequest, Reservation
+from models import Availability, Category, Item, Library, NotifyRequest, Reservation, User
 from seed import seed_if_empty
 
-# Single mock user for the demo (auth is not implemented yet).
-MOCK_USER_EMAIL = "katherine.nie@example.com"
 AVAILABILITY_HORIZON_DAYS = 120  # how far ahead the calendar computes availability
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -102,6 +101,40 @@ def register_routes(app):
     def health():
         return jsonify({"status": "ok"})
 
+    # ---- auth (library-card login) ----
+
+    @app.post("/api/login")
+    def login():
+        body = request.get_json(silent=True) or {}
+        card = (body.get("card_number") or "").strip()
+        password = body.get("password") or ""
+        user = User.query.filter_by(card_number=card).first()
+        if user is None or not check_password_hash(user.password_hash, password):
+            abort(401, description="Invalid library card number or password")
+        return jsonify(user.to_public())
+
+    @app.post("/api/register")
+    def register():
+        body = request.get_json(silent=True) or {}
+        card = (body.get("card_number") or "").strip()
+        password = body.get("password") or ""
+        name = (body.get("name") or "").strip()
+        lib = body.get("lib")
+
+        if not card or not password or not name or not lib:
+            abort(400, description="Name, library, card number, and password are all required")
+        if db.session.get(Library, lib) is None:
+            abort(400, description="Choose a valid library")
+        if User.query.filter_by(card_number=card).first() is not None:
+            abort(409, description="That library card is already registered — try signing in")
+
+        user = User(
+            card_number=card, password_hash=generate_password_hash(password), name=name, lib_key=lib,
+        )
+        db.session.add(user)
+        db.session.commit()
+        return jsonify(user.to_public()), 201
+
     @app.get("/api/libraries")
     def get_libraries():
         libs = Library.query.order_by(Library.order).all()
@@ -152,9 +185,12 @@ def register_routes(app):
 
     @app.get("/api/reservations")
     def list_reservations():
-        # Only the current (mock) user's reservations; other users' bookings still
-        # affect availability but aren't listed here.
-        q = Reservation.query.filter_by(user_email=MOCK_USER_EMAIL)
+        # A user's own reservations (by their library-card number). Other users'
+        # bookings still affect availability but aren't listed here.
+        user = request.args.get("user")
+        if not user:
+            return jsonify([])
+        q = Reservation.query.filter_by(user_email=user)
         status = request.args.get("status")
         if status:
             q = q.filter_by(status=status)
@@ -169,6 +205,11 @@ def register_routes(app):
         pickup_date = body.get("pickup_date")
         days = body.get("days")
         reminders = bool(body.get("reminders", True))
+        user = (body.get("user") or "").strip()
+
+        # Must be a real, signed-in library card.
+        if not user or User.query.filter_by(card_number=user).first() is None:
+            abort(401, description="Please sign in with your library card to reserve")
 
         item = db.session.get(Item, item_id)
         if item is None:
@@ -209,7 +250,7 @@ def register_routes(app):
         resv = Reservation(
             code="PENDING", item_id=item_id, lib_key=lib, pickup_date=pickup.isoformat(),
             days=days, return_date=return_.isoformat(), reminders=reminders,
-            status="reserved", user_email=MOCK_USER_EMAIL,
+            status="reserved", user_email=user,
         )
         db.session.add(resv)
         db.session.flush()
@@ -235,7 +276,7 @@ def register_routes(app):
         lib = body.get("lib")
         if db.session.get(Item, item_id) is None:
             abort(404, description="Unknown item")
-        req = NotifyRequest(item_id=item_id, lib_key=lib, email=body.get("email", MOCK_USER_EMAIL))
+        req = NotifyRequest(item_id=item_id, lib_key=lib, email=body.get("email"))
         db.session.add(req)
         db.session.commit()
         return jsonify({"ok": True}), 201

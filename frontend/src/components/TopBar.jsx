@@ -32,7 +32,7 @@ export default function TopBar() {
             <div className="user-menu">
               <button
                 className="avatar"
-                title={user.email}
+                title={user.name}
                 onClick={(e) => {
                   e.stopPropagation()
                   setMenuOpen(!menuOpen)
@@ -44,7 +44,9 @@ export default function TopBar() {
                 <div className="menu">
                   <div className="menu-head">
                     <div className="menu-name">{user.name}</div>
-                    <div className="menu-email">{user.email}</div>
+                    <div className="menu-email">
+                      Card {user.card_number} · {user.libraryName}
+                    </div>
                   </div>
                   <button
                     className="menu-item"
@@ -54,6 +56,15 @@ export default function TopBar() {
                     }}
                   >
                     My reservations
+                  </button>
+                  <button
+                    className="menu-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      go('help')
+                    }}
+                  >
+                    Help &amp; FAQ
                   </button>
                   <button className="menu-item" onClick={() => logOut()}>
                     Log out

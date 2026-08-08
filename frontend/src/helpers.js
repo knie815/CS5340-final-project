@@ -128,8 +128,9 @@ export function monogram(name) {
 }
 
 // The prototype's filteredItems(), now taking items + filter state + libraries.
+// filters.sortBy: 'distance' (default) | 'availability'.
 export function filteredItems(items, filters, libraries) {
-  const { query, filterCat, filterLib, onlyAvailable, maxDist } = filters
+  const { query, filterCat, filterLib, onlyAvailable, maxDist, sortBy } = filters
   let list = items.slice()
   const q = query.trim().toLowerCase()
   if (q) {
@@ -144,10 +145,14 @@ export function filteredItems(items, filters, libraries) {
   if (filterLib.length) list = list.filter((i) => candidateAvail(i, filterLib).some((a) => a.count > 0))
   if (onlyAvailable) list = list.filter((i) => candidateAvail(i, filterLib).some((a) => a.count > 0))
   list = list.filter((i) => nearestDistOf(candidateAvail(i, filterLib), libraries) <= maxDist)
-  list.sort(
-    (a, b) =>
-      nearestDistOf(candidateAvail(a, filterLib), libraries) -
-      nearestDistOf(candidateAvail(b, filterLib), libraries)
-  )
+
+  const distanceOf = (i) => nearestDistOf(candidateAvail(i, filterLib), libraries)
+  const availOf = (i) => candidateAvail(i, filterLib).reduce((s, a) => s + a.count, 0)
+
+  if (sortBy === 'availability') {
+    list.sort((a, b) => availOf(b) - availOf(a) || distanceOf(a) - distanceOf(b))
+  } else {
+    list.sort((a, b) => distanceOf(a) - distanceOf(b))
+  }
   return list
 }

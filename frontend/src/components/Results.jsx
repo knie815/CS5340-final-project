@@ -15,10 +15,10 @@ export default function Results() {
   const {
     items, libraries, categories, go,
     query, filterCat, setFilterCat, filterLib, setFilterLib,
-    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist,
+    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist, sortBy, setSortBy,
   } = useApp()
 
-  const list = filteredItems(items, { query, filterCat, filterLib, onlyAvailable, maxDist }, libraries)
+  const list = filteredItems(items, { query, filterCat, filterLib, onlyAvailable, maxDist, sortBy }, libraries)
   const title = filterCat
     ? categories.find((c) => c.key === filterCat)?.name
     : query
@@ -110,6 +110,13 @@ export default function Results() {
                 <b>{list.length}</b> item{list.length === 1 ? '' : 's'} found across{' '}
                 {Object.keys(libraries).length} libraries
               </div>
+              <label className="sort-control">
+                Sort by
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort results by">
+                  <option value="distance">Distance</option>
+                  <option value="availability">Availability</option>
+                </select>
+              </label>
             </div>
             {list.length ? (
               <div className="grid-items">

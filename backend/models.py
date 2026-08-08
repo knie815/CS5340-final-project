@@ -101,6 +101,34 @@ class Reservation(db.Model):
         }
 
 
+class User(db.Model):
+    # A login is a library card: you must have a card at some library to sign up.
+    # `card_number` is the username; passwords are stored hashed.
+    id = db.Column(db.Integer, primary_key=True)
+    card_number = db.Column(db.String, unique=True, nullable=False)
+    password_hash = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    lib_key = db.Column(db.String, db.ForeignKey("library.key"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    library = db.relationship("Library")
+
+    def initials(self):
+        words = [w for w in self.name.replace("-", " ").split() if w]
+        letters = (words[0][0] if words else "") + (words[1][0] if len(words) > 1 else "")
+        return letters.upper() or "?"
+
+    def to_public(self):
+        """Safe, non-sensitive fields for the client (never the password hash)."""
+        return {
+            "card_number": self.card_number,
+            "name": self.name,
+            "lib": self.lib_key,
+            "libraryName": self.library.name if self.library else None,
+            "initials": self.initials(),
+        }
+
+
 class NotifyRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.String, db.ForeignKey("item.id"), nullable=False)

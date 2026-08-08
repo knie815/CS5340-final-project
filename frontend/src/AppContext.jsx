@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getItems, getLibraries, getCategories, getReservations,
-  createReservation, cancelReservationApi, notifyRequest,
+  createReservation, cancelReservationApi, loginApi, registerApi,
 } from './api'
 import { diffDaysISO } from './helpers'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
 
-const USER = { name: 'Katherine Nie', initials: 'KN', email: 'katherine.nie@example.com' }
+const STORAGE_KEY = 'borrowit_user'
 
 export function AppProvider({ children }) {
   // ---- API data ----
@@ -19,15 +19,13 @@ export function AppProvider({ children }) {
   const [dataStatus, setDataStatus] = useState('loading') // loading | ready | error
 
   const refreshItems = useCallback(() => getItems().then(setItems), [])
-  const refreshReservations = useCallback(() => getReservations().then(setReservations), [])
 
   useEffect(() => {
-    Promise.all([getItems(), getLibraries(), getCategories(), getReservations()])
-      .then(([i, l, c, r]) => {
+    Promise.all([getItems(), getLibraries(), getCategories()])
+      .then(([i, l, c]) => {
         setItems(i)
         setLibraries(l)
         setCategories(c)
-        setReservations(r)
         setDataStatus('ready')
       })
       .catch(() => setDataStatus('error'))
@@ -82,26 +80,44 @@ export function AppProvider({ children }) {
     toast._t = setTimeout(() => setToastShow(false), 2400)
   }, [])
 
-  // ---- auth (mocked) ----
-  const [authed, setAuthed] = useState(false)
+  // ---- auth (library-card login, persisted in localStorage) ----
+  const [user, setUser] = useState(() => {
+    try {
+      const s = localStorage.getItem(STORAGE_KEY)
+      return s ? JSON.parse(s) : null
+    } catch {
+      return null
+    }
+  })
+  const authed = !!user
   const [afterAuth, setAfterAuth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const requireAuth = useCallback(
-    (action) => {
-      if (authed) {
-        action()
-        return
-      }
-      setAfterAuth(() => action)
-      go('signin')
-    },
-    [authed, go]
-  )
-  const signIn = useCallback(
-    (msg) => {
-      setAuthed(true)
-      toast(msg || 'Signed in')
+  // A ref mirror so data callbacks can read the current card without stale closures.
+  const userRef = useRef(user)
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  const refreshReservations = useCallback(() => {
+    const u = userRef.current
+    if (!u) {
+      setReservations([])
+      return Promise.resolve()
+    }
+    return getReservations(u.card_number).then(setReservations)
+  }, [])
+
+  // Load (or clear) the signed-in user's reservations whenever the user changes.
+  useEffect(() => {
+    refreshReservations()
+  }, [user, refreshReservations])
+
+  const finishAuth = useCallback(
+    (u) => {
+      setUser(u)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(u))
+      toast(`Signed in — welcome, ${u.name.split(' ')[0]}`)
       const next = afterAuth
       setAfterAuth(null)
       if (next) next()
@@ -109,10 +125,38 @@ export function AppProvider({ children }) {
     },
     [afterAuth, go, toast]
   )
+
+  // login/register throw on failure so the SignIn screen can show the message.
+  const login = useCallback(
+    async (card, password) => {
+      finishAuth(await loginApi(card, password))
+    },
+    [finishAuth]
+  )
+  const register = useCallback(
+    async (payload) => {
+      finishAuth(await registerApi(payload))
+    },
+    [finishAuth]
+  )
+
+  const requireAuth = useCallback(
+    (action) => {
+      if (userRef.current) {
+        action()
+        return
+      }
+      setAfterAuth(() => action)
+      go('signin')
+    },
+    [go]
+  )
   const logOut = useCallback(() => {
-    setAuthed(false)
+    setUser(null)
+    localStorage.removeItem(STORAGE_KEY)
     setAfterAuth(null)
     setMenuOpen(false)
+    setReservations([])
     toast('Signed out')
     go('home')
   }, [go, toast])
@@ -123,6 +167,7 @@ export function AppProvider({ children }) {
   const [filterLib, setFilterLib] = useState([])
   const [onlyAvailable, setOnlyAvailable] = useState(false)
   const [maxDist, setMaxDist] = useState(10)
+  const [sortBy, setSortBy] = useState('distance') // distance | availability | library
 
   const search = useCallback(
     (q) => {
@@ -186,6 +231,7 @@ export function AppProvider({ children }) {
         pickup_date: reserve.start, // ISO yyyy-mm-dd
         days: diffDaysISO(reserve.start, reserve.end),
         reminders: reserve.reminders,
+        user: user?.card_number,
       })
       setLastReservation(resv)
       await Promise.all([refreshItems(), refreshReservations()])
@@ -193,7 +239,7 @@ export function AppProvider({ children }) {
     } catch (err) {
       toast(err.message || 'Could not complete reservation')
     }
-  }, [currentItem, reserve, refreshItems, refreshReservations, go, toast])
+  }, [currentItem, reserve, user, refreshItems, refreshReservations, go, toast])
 
   const cancelReservation = useCallback(
     async (code) => {
@@ -209,30 +255,16 @@ export function AppProvider({ children }) {
     [refreshItems, refreshReservations, toast]
   )
 
-  const notify = useCallback(
-    async (itemId, lib) => {
-      try {
-        await notifyRequest({ item_id: itemId, lib, email: USER.email })
-        const libName = libraries[lib]?.name || 'that library'
-        toast(`We'll email you when it's back at ${libName}`)
-      } catch (err) {
-        toast(err.message || 'Could not set up notification')
-      }
-    },
-    [libraries, toast]
-  )
-
   const value = {
     items, libraries, categories, dataStatus,
     screen, go,
     toastMsg, toastShow, toast,
-    authed, menuOpen, setMenuOpen, requireAuth, signIn, logOut,
+    authed, user, menuOpen, setMenuOpen, requireAuth, login, register, logOut,
     query, setQuery, filterCat, setFilterCat, filterLib, setFilterLib,
-    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist, search, browseLibrary,
+    onlyAvailable, setOnlyAvailable, maxDist, setMaxDist, sortBy, setSortBy, search, browseLibrary,
     currentItem, openItem, reserve, setReserve,
     reservations, lastReservation, confirmReservation,
-    cancelingCode, setCancelingCode, cancelReservation, notify,
-    user: USER,
+    cancelingCode, setCancelingCode, cancelReservation,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

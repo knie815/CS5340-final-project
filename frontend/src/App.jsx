@@ -10,6 +10,7 @@ import ItemDetail from './components/ItemDetail'
 import Reserve from './components/Reserve'
 import Confirm from './components/Confirm'
 import MyReservations from './components/MyReservations'
+import Help from './components/Help'
 
 const SCREENS = {
   home: Home,
@@ -18,6 +19,7 @@ const SCREENS = {
   reserve: Reserve,
   confirm: Confirm,
   reservations: MyReservations,
+  help: Help,
 }
 
 function Toast() {
