@@ -42,11 +42,11 @@ export default function MyReservations() {
         {confirming ? (
           <div className="cancel-confirm">
             <span className="cc-q">Cancel this reservation?</span>
-            <button className="btn btn-sm btn-danger" onClick={() => cancelReservation(r.code)}>
-              Yes, cancel
-            </button>
             <button className="btn btn-sm btn-keep" onClick={() => setCancelingCode(null)}>
               Keep
+            </button>
+            <button className="btn btn-sm btn-danger" onClick={() => cancelReservation(r.code)}>
+              Yes, cancel
             </button>
           </div>
         ) : (
