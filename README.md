@@ -1,4 +1,4 @@
-# BorrowIt — a Library of Things
+# BorrowIt - a Library of Things
 
 ## System Overview
 
@@ -169,89 +169,8 @@ four seeded reservations so **My Reservations** is populated immediately — one
 currently borrowed, two upcoming, and one cancelled.
 
 You can also create your own account: **Register a library card** on the sign-in
-screen. Pick any partner library, invent any unused card number and password, and
-you're in — new accounts start with an empty reservation list, which is useful for
-seeing the flow from scratch.
+screen.
 
 > **Resetting the demo data:** stop the backend, delete `backend/borrowit.db`, and
 > start it again. Everything (including the demo account and its reservations) is
 > re-seeded relative to the current date.
-
----
-
-## What to try as a grader
-
-1. **Browse & search** — search "drill" or pick a category from the home page.
-2. **Reserve** — open an item, choose a library and a pickup date on the calendar
-   (fully booked days are greyed out), pick a loan length, confirm. You'll be sent
-   to sign-in first if you're not logged in.
-3. **See availability change** — after reserving the last copy for a date range,
-   revisit the item; those dates are now unavailable at that library.
-4. **My Reservations** — view your bookings with reservation codes and return-by
-   dates, and cancel one. The freed dates immediately become bookable again.
-
----
-
-## API reference
-
-| Method | Path                                       | Description                                                                 |
-| ------ | ------------------------------------------ | --------------------------------------------------------------------------- |
-| GET    | `/api/health`                              | Liveness check                                                              |
-| POST   | `/api/login`                               | Sign in — `{ card_number, password }` (401 on bad credentials)              |
-| POST   | `/api/register`                            | Create an account — `{ name, lib, card_number, password }` (409 if the card exists) |
-| GET    | `/api/libraries`                           | Partner libraries with distance and hours                                   |
-| GET    | `/api/categories`                          | Item categories                                                             |
-| GET    | `/api/items`                               | All catalog items, with copies available *today* per library                |
-| GET    | `/api/items/<id>`                          | A single item (404 if unknown)                                              |
-| GET    | `/api/items/<id>/availability?lib=&days=`  | Fully-booked upcoming dates at a library — powers the calendar              |
-| GET    | `/api/reservations?user=<card>&status=`    | That user's reservations (empty without `user`)                             |
-| POST   | `/api/reservations`                        | Create a reservation (401 signed-out, 400 past date, 409 no free copy)      |
-| POST   | `/api/reservations/<code>/cancel`          | Cancel a reservation (idempotent)                                           |
-| POST   | `/api/notify`                              | Register interest in an out-of-stock item                                   |
-
-**Create-reservation body:** `{ "item_id", "lib", "pickup_date" (ISO yyyy-mm-dd), "days", "reminders", "user" }`
-
-### How availability works
-
-Each `(item, library)` pair has a fixed **capacity** — the number of physical copies
-that branch owns. Copies are never mutated. Availability for a given day is computed
-at request time by subtracting the reservations that overlap that day. A loan
-occupies `[pickup_date, return_date)`, so the return day is free again for the next
-borrower. Cancelling a reservation simply marks it `cancelled`, and the dates it held
-become available again automatically. This is why an item with zero copies free today
-can still be booked for next month.
-
-Errors are returned as JSON (`{"error": ..., "description": ...}`) so the UI can show
-the real message.
-
----
-
-## Useful commands
-
-```bash
-# Backend smoke test (with the server running)
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/items
-curl -X POST http://localhost:5000/api/login \
-  -H 'Content-Type: application/json' \
-  -d '{"card_number":"1001","password":"borrow123"}'
-
-# Frontend: lint
-cd frontend && npm run lint
-
-# Frontend: production build (outputs to frontend/dist/) and preview it
-cd frontend && npm run build && npm run preview
-```
-
----
-
-## Troubleshooting
-
-| Symptom                                           | Fix                                                                     |
-| ------------------------------------------------- | ----------------------------------------------------------------------- |
-| Frontend shows "Could not reach the API."         | The Flask backend (Terminal 1) isn't running. Start it on port 5000.    |
-| `npm: command not found` / engine or version errors | Node isn't loaded or is too old. `source ~/.nvm/nvm.sh && nvm use --lts`. |
-| `ensurepip is not available` creating the venv    | Use `virtualenv` instead — see step 2.                                  |
-| Port 5000 or 5173 already in use                  | Stop the other process, or pass a different `--port`.                   |
-| Sign-in rejects `1001` / `borrow123`              | The DB predates the demo account. Delete `backend/borrowit.db` and restart the backend. |
-| Calendar shows everything greyed out              | You picked a library that doesn't carry that item — switch libraries.   |
